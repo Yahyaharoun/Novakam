@@ -118,8 +118,8 @@ function LoginForm() {
     const searchStr = searchQuery.toLowerCase();
     
     let shop = null;
-    let foundRegisters = [];
-    let foundEmployees = [];
+    let foundRegisters: any[] = [];
+    let foundEmployees: any[] = [];
 
     // Simulate found shop
     if (searchStr.includes("nova") || searchStr.includes("test")) {
