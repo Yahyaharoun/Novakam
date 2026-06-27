@@ -57,7 +57,7 @@ export async function loadUserContext(supabase: SupabaseClient<Database>, user: 
     .from("user_shops")
     .select("shop_id, roles(name), shops(*)")
     .eq("user_id", user.id)
-    .eq("is_deleted", false)
+    .eq("is_active", true)
     .order("created_at", { ascending: false })
     .limit(1) as unknown as Promise<QueryResult>;
   const { data, error } = await query;
