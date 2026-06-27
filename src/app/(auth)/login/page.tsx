@@ -103,6 +103,9 @@ function LoginForm() {
       authStore.setShops([userShop as any]);
       authStore.setCurrentShop(userShop as any, "owner");
       
+      // On purge l'ancien cookie de session locale (POS) pour ne pas être bloqué sur le compte Test
+      document.cookie = "novakam-local-session=; path=/; max-age=0";
+      
       toast.success(`Bienvenue dans ${userShop.name} !`);
       router.push("/dashboard");
 

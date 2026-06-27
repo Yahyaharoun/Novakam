@@ -124,6 +124,9 @@ export default function RegisterPage() {
           useAuthStore.getState().setCurrentShop(shopData as any, "owner");
         }
 
+        // On purge l'ancien cookie de session locale (POS)
+        document.cookie = "novakam-local-session=; path=/; max-age=0";
+
         // On arrête le loader AVANT de changer de page pour éviter que le bouton tourne pendant la compilation Next.js
         setLoading(false);
         router.push("/dashboard");
