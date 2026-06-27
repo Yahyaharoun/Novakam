@@ -94,7 +94,7 @@ function LoginForm() {
         throw new Error("Aucune boutique trouvée pour ce compte.");
       }
 
-      const userShop = shops[0]; // On prend la première boutique pour l'instant
+      const userShop = shops[0] as any; // On prend la première boutique pour l'instant
 
       // 3. Mettre à jour le Store Local
       const authStore = useAuthStore.getState();

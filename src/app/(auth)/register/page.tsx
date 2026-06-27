@@ -91,8 +91,8 @@ export default function RegisterPage() {
           .replace(/[^a-z0-9]+/g, "-")
           .replace(/^-|-$/g, "");
 
-        const { data: shopData, error: shopError } = await supabase
-          .from("shops")
+        const { data: shopData, error: shopError } = await (supabase
+          .from("shops") as any)
           .insert({
             name: formData.shopName,
             slug: slug,
