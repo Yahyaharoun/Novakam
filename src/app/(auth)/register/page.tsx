@@ -6,6 +6,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Loader2, Wifi, Zap, Check, ArrowRight, ShieldCheck } from "lucide-react";
 import { useAuthStore } from "@/lib/store/auth.store";
+import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
 
 const PLANS = [
@@ -29,7 +30,7 @@ export default function RegisterPage() {
     city: "",
     sector: "",
   });
-  const [selectedPlan, setSelectedPlan] = useState("business"); // Default plan
+  const [selectedPlan, setSelectedPlan] = useState("free"); // Default plan to Free
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,56 +39,15 @@ export default function RegisterPage() {
   const update = (field: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setFormData((prev) => ({ ...prev, [field]: e.target.value }));
 
-  /** LOCAL BYPASS — injects mock user into Zustand store without Supabase */
-  async function handleLocalBypass() {
-    setLoading(true);
-    setError(null);
-
-    // Small delay to simulate account creation
-    await new Promise((r) => setTimeout(r, 700));
-
-    const mockUser = {
-      id: "mock-user-001",
-      email: formData.email || "demo@novakam.app",
-      app_metadata: {},
-      user_metadata: {
-        full_name: formData.fullName || "Demo User",
-      },
-      aud: "authenticated",
-      created_at: new Date().toISOString(),
-    } as unknown as User;
-
-    useAuthStore.getState().setUser(mockUser);
-    
-    // Create Shop
-    const mockShop = {
-      id: "mock-shop-" + Date.now(),
-      name: formData.shopName || "Ma Boutique",
-      slug: (formData.shopName || "Ma Boutique")
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-|-$/g, ""),
-      currency: "XAF",
-      language: "fr",
-      logo_url: null,
-      plan: selectedPlan,
-      country: "Cameroun",
-      region: formData.region,
-    };
-    useAuthStore.getState().setCurrentShop(mockShop as any, "owner");
-
-    // Set cookie for proxy.ts
-    document.cookie = "novakam-local-session=true; path=/; max-age=86400";
-    if (typeof window !== "undefined") {
-      localStorage.setItem("novakam-mock-shopName", mockShop.name);
-    }
-
-    router.push("/dashboard");
-  }
-
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    // Vérification du mode hors-ligne
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setError("L'inscription d'une nouvelle boutique nécessite une connexion Internet.");
+      return;
+    }
 
     if (formData.password !== formData.confirmPassword) {
       setError("Les mots de passe ne correspondent pas.");
@@ -98,8 +58,89 @@ export default function RegisterPage() {
       return;
     }
 
-    // In local/offline mode, always use the bypass
-    await handleLocalBypass();
+    setLoading(true);
+    
+    try {
+      const supabase = createClient();
+      
+      // 1. Inscription Utilisateur (Supabase Auth)
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            full_name: formData.fullName,
+          }
+        }
+      });
+
+      if (authError) throw authError;
+
+      // Si Supabase demande une confirmation d'email (pas de session immédiate)
+      if (authData.user && !authData.session) {
+        setSuccess(true);
+        setLoading(false);
+        return; 
+      }
+
+      // Si la session est active (confirmation email désactivée)
+      if (authData.user && authData.session) {
+        // 2. Création de la boutique dans la table `shops`
+        const slug = (formData.shopName || "Ma Boutique")
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-|-$/g, "");
+
+        const { data: shopData, error: shopError } = await supabase
+          .from("shops")
+          .insert({
+            name: formData.shopName,
+            slug: slug,
+            owner_id: authData.user.id,
+            plan: selectedPlan as any,
+            country: "Cameroun",
+            city: formData.city,
+            phone: formData.phone,
+            currency: "XAF",
+            language: "fr",
+            timezone: "Africa/Douala",
+            is_active: true
+          })
+          .select()
+          .single();
+
+        if (shopError) {
+          // Si le slug existe déjà (unique constraint), on prévient
+          if (shopError.code === '23505') {
+            throw new Error("Ce nom de boutique est déjà utilisé, veuillez en choisir un autre.");
+          }
+          throw shopError;
+        }
+
+        // 3. Mise à jour du store Zustand
+        useAuthStore.getState().setUser(authData.user);
+        if (shopData) {
+          useAuthStore.getState().setShops([shopData as any]);
+          useAuthStore.getState().setCurrentShop(shopData as any, "owner");
+        }
+
+        // On arrête le loader AVANT de changer de page pour éviter que le bouton tourne pendant la compilation Next.js
+        setLoading(false);
+        router.push("/dashboard");
+      }
+    } catch (err: any) {
+      console.error(err);
+      
+      // Gestion des erreurs spécifiques Supabase
+      if (err.message && err.message.includes("Failed to fetch")) {
+        setError("Erreur réseau : Impossible de joindre les serveurs sécurisés. Vérifiez votre connexion.");
+      } else if (err.message && err.message.includes("User already registered")) {
+        setError("Cette adresse email est déjà utilisée. Veuillez vous connecter.");
+      } else {
+        setError(err.message || "Une erreur est survenue lors de la création du compte.");
+      }
+      setLoading(false);
+    }
   }
 
   const inputStyle = "w-full px-4 py-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-colors shadow-sm";
@@ -186,7 +227,7 @@ export default function RegisterPage() {
 
           <div className="flex items-center gap-2 p-3 mb-8 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 rounded-xl text-xs font-medium text-blue-700 dark:text-blue-400">
             <ShieldCheck size={16} className="text-blue-600 dark:text-blue-400" />
-            Mode d'évaluation locale actif — 100% sécurisé
+            Connexion directe à la base de données Sécurisée (Production)
           </div>
 
           <form onSubmit={handleRegister} className="space-y-6">

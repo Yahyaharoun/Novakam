@@ -63,43 +63,56 @@ function LoginForm() {
   };
 
   /** =========================================================================
-   *  ADMIN LOGIN LOGIC (Simulated Bypass)
+   *  ADMIN LOGIN LOGIC (Supabase)
    *  ========================================================================= */
   async function handleAdminLogin(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    await new Promise((r) => setTimeout(r, 600));
 
-    const userEmail = email.toLowerCase() || "pro@novakam.app";
-    const simulatedPlan = userEmail.includes("free") ? "free" : userEmail.includes("starter") ? "starter" : "pro";
+    try {
+      const supabase = createClient();
+      
+      // 1. Authentification
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: password
+      });
 
-    const mockUser = {
-      id: `mock-admin-${simulatedPlan}`,
-      email: userEmail,
-      app_metadata: {},
-      user_metadata: { full_name: "Administrateur" },
-      aud: "authenticated",
-      created_at: new Date().toISOString(),
-    } as unknown as User;
+      if (authError) throw new Error("Email ou mot de passe incorrect.");
 
-    const authStore = useAuthStore.getState();
-    const targetShop = {
-      id: `mock-shop-${simulatedPlan}`,
-      name: "Ma Boutique Admin",
-      slug: `boutique-${simulatedPlan}`,
-      currency: "XAF",
-      language: "fr",
-      logo_url: null as null,
-      plan: simulatedPlan as any,
-    };
-    
-    authStore.setShops([targetShop]);
-    authStore.setUser(mockUser);
-    authStore.setCurrentShop(targetShop as any, "owner");
-    document.cookie = "novakam-local-session=true; path=/; max-age=86400";
-    toast.success("Connexion réussie !");
-    router.push("/dashboard");
+      // 2. Récupérer la boutique de l'utilisateur
+      const { data: shops, error: shopsError } = await supabase
+        .from('shops')
+        .select('*')
+        .eq('owner_id', authData.user.id)
+        .eq('is_deleted', false)
+        .order('created_at', { ascending: false });
+
+      if (shopsError) throw shopsError;
+
+      if (!shops || shops.length === 0) {
+        throw new Error("Aucune boutique trouvée pour ce compte.");
+      }
+
+      const userShop = shops[0]; // On prend la première boutique pour l'instant
+
+      // 3. Mettre à jour le Store Local
+      const authStore = useAuthStore.getState();
+      authStore.setUser(authData.user);
+      authStore.setShops([userShop as any]);
+      authStore.setCurrentShop(userShop as any, "owner");
+      
+      document.cookie = "novakam-local-session=true; path=/; max-age=86400";
+      toast.success(`Bienvenue dans ${userShop.name} !`);
+      router.push("/dashboard");
+
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || "Une erreur est survenue lors de la connexion.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   /** =========================================================================
