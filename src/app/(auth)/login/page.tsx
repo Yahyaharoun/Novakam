@@ -86,7 +86,6 @@ function LoginForm() {
         .from('shops')
         .select('*')
         .eq('owner_id', authData.user.id)
-        .eq('is_deleted', false)
         .order('created_at', { ascending: false });
 
       if (shopsError) throw shopsError;
