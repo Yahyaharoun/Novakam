@@ -1,0 +1,50 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "loading": "Loading...",
+    "success": "Operation successful",
+    "error": "An error occurred"
+  },
+  "pos": {
+    "title": "Point of Sale",
+    "search_placeholder": "Scan barcode or search...",
+    "cart": "Current Cart",
+    "empty_cart": "Empty cart",
+    "subtotal": "Subtotal",
+    "discount": "Discount",
+    "total": "Total to Pay",
+    "pay": "Charge",
+    "select_customer": "Select a customer (Optional)"
+  },
+  "settings": {
+    "title": "Settings",
+    "theme": "Appearance",
+    "language": "Language",
+    "light": "Light Mode",
+    "dark": "Dark Mode",
+    "shop_info": "Shop Information",
+    "currency": "Currency"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "pos": "Point of Sale",
+    "management": "MANAGEMENT",
+    "products": "Products",
+    "inventory": "Inventory",
+    "customers": "Customers",
+    "suppliers": "Suppliers",
+    "finances": "FINANCE",
+    "credits": "Customer Debts",
+    "debts": "Supplier Debts",
+    "expenses": "Expenses",
+    "treasury": "Treasury",
+    "hr_reports": "HR & REPORTS",
+    "employees": "Employees",
+    "registers": "Registers / Terminals",
+    "warehouses": "Warehouses",
+    "reports": "Reports"
+  }
+}

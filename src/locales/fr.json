@@ -1,0 +1,50 @@
+{
+  "common": {
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "loading": "Chargement...",
+    "success": "Opération réussie",
+    "error": "Une erreur est survenue"
+  },
+  "pos": {
+    "title": "Caisse (POS)",
+    "search_placeholder": "Scanner un code-barres ou chercher...",
+    "cart": "Panier Actuel",
+    "empty_cart": "Panier vide",
+    "subtotal": "Sous-total",
+    "discount": "Remise",
+    "total": "Total à Payer",
+    "pay": "Encaisser",
+    "select_customer": "Sélectionner un client (Optionnel)"
+  },
+  "settings": {
+    "title": "Paramètres",
+    "theme": "Apparence",
+    "language": "Langue",
+    "light": "Mode Clair",
+    "dark": "Mode Sombre",
+    "shop_info": "Informations de la Boutique",
+    "currency": "Devise"
+  },
+  "nav": {
+    "dashboard": "Tableau de bord",
+    "pos": "Caisse",
+    "management": "GESTION",
+    "products": "Produits",
+    "inventory": "Stocks",
+    "customers": "Clients",
+    "suppliers": "Fournisseurs",
+    "finances": "FINANCES",
+    "credits": "Dettes clients",
+    "debts": "Dettes fournisseurs",
+    "expenses": "Dépenses",
+    "treasury": "Trésorerie",
+    "hr_reports": "RH & RAPPORTS",
+    "employees": "Employés",
+    "registers": "Caisses / Terminaux",
+    "warehouses": "Magasins / Entrepôts",
+    "reports": "Rapports"
+  }
+}
