@@ -4,9 +4,17 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Eye, EyeOff, Loader2, Wifi, Zap, Store } from "lucide-react";
+import { Eye, EyeOff, Loader2, Wifi, Zap, Check, ArrowRight, ShieldCheck } from "lucide-react";
 import { useAuthStore } from "@/lib/store/auth.store";
 import type { User } from "@supabase/supabase-js";
+
+const PLANS = [
+  { id: "free", name: "Free", price: "0 FCFA" },
+  { id: "starter", name: "Starter", price: "3 000 FCFA" },
+  { id: "business", name: "Business", price: "7 000 FCFA" },
+  { id: "pro", name: "Pro", price: "15 000 FCFA" },
+  { id: "entreprise", name: "Enterprise", price: "Sur mesure" },
+];
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -21,6 +29,7 @@ export default function RegisterPage() {
     city: "",
     sector: "",
   });
+  const [selectedPlan, setSelectedPlan] = useState("business"); // Default plan
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,7 +70,7 @@ export default function RegisterPage() {
       currency: "XAF",
       language: "fr",
       logo_url: null,
-      plan: "free",
+      plan: selectedPlan,
       country: "Cameroun",
       region: formData.region,
     };
@@ -93,13 +102,13 @@ export default function RegisterPage() {
     await handleLocalBypass();
   }
 
-  const inputStyle = "w-full px-4 py-2.5 bg-gray-50 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-xl text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-colors";
-  const labelStyle = "block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5";
+  const inputStyle = "w-full px-4 py-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-colors shadow-sm";
+  const labelStyle = "block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1.5 uppercase tracking-wide";
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 sm:p-8 bg-gray-50 dark:bg-slate-900 transition-colors duration-300">
-        <div className="w-full max-w-md bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-8 shadow-xl text-center">
+      <div className="min-h-screen flex items-center justify-center p-4 sm:p-8 bg-gray-50 dark:bg-[#0B1120] transition-colors duration-300">
+        <div className="w-full max-w-md bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-8 shadow-2xl text-center">
           <div className="w-16 h-16 mx-auto bg-gradient-to-br from-green-500 to-emerald-500 rounded-full flex items-center justify-center text-white text-3xl mb-5 shadow-lg">
             ✓
           </div>
@@ -121,244 +130,191 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 sm:p-8 bg-gray-50 dark:bg-slate-900 transition-colors duration-300">
-      <div className="w-full max-w-[460px] bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-6 sm:p-8 shadow-xl relative z-10 animate-[page-in_0.3s_ease]">
+    <div className="min-h-screen flex bg-white dark:bg-[#0B1120] font-sans">
+      
+      {/* ── LEFT PANEL (IMAGE) ───────────────────────────────────────────── */}
+      <div className="hidden lg:flex w-1/2 relative bg-slate-900 overflow-hidden flex-col justify-between items-start p-12">
+        <Image
+          src="/images/auth-hero.png"
+          alt="NOVAKAM SaaS"
+          fill
+          className="object-cover opacity-60 mix-blend-screen scale-105"
+          priority
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-blue-900/30 via-slate-900/50 to-slate-900"></div>
         
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2 group mb-6">
-            <span className="font-black text-2xl tracking-tight text-blue-700 dark:text-blue-500" style={{ fontFamily: "'Space Grotesk', system-ui, sans-serif" }}>NOVAKAM</span>
-          </Link>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1.5 tracking-tight">
-            Créer votre compte
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Commencez à gérer votre boutique gratuitement
-          </p>
-        </div>
+        <Link href="/" className="relative z-10 flex items-center gap-3 group">
+          <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-600/20">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+          </div>
+          <span className="font-black text-3xl tracking-tight text-white" style={{ fontFamily: "'Space Grotesk', system-ui, sans-serif" }}>NOVAKAM</span>
+        </Link>
 
-        {/* Local Bypass Banner */}
-        <div className="flex items-center gap-2 p-3 mb-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 rounded-xl text-xs text-blue-600 dark:text-blue-400">
-          <Zap size={14} className="flex-shrink-0" />
-          <span>Mode Local actif — inscription instantanée sans serveur</span>
-        </div>
-
-          {/* Form */}
-        <form onSubmit={handleRegister}>
-          {error && (
-            <div className="p-3 mb-5 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800/50 rounded-xl text-red-600 dark:text-red-400 text-sm">
-              {error}
+        <div className="relative z-10 w-full max-w-lg mb-12">
+          <blockquote className="text-2xl font-bold text-white mb-6 leading-relaxed">
+            "Depuis que nous utilisons NOVAKAM, la gestion de nos 3 boutiques est devenue un jeu d'enfant. Plus aucune perte, même lors des coupures Internet."
+          </blockquote>
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-500 flex items-center justify-center text-white font-bold text-lg border-2 border-white/20">
+              MG
             </div>
-          )}
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-            {/* Full name */}
             <div>
-              <label htmlFor="fullName" className={labelStyle}>Nom complet *</label>
-              <input
-                id="fullName"
-                type="text"
-                required
-                placeholder="Ex: Jean Dupont"
-                value={formData.fullName}
-                onChange={update("fullName")}
-                className={inputStyle}
-              />
-            </div>
-
-            {/* Email */}
-            <div>
-              <label htmlFor="reg-email" className={labelStyle}>Adresse email *</label>
-              <input
-                id="reg-email"
-                type="email"
-                autoComplete="email"
-                required
-                placeholder="vous@example.com"
-                value={formData.email}
-                onChange={update("email")}
-                className={inputStyle}
-              />
+              <div className="text-white font-bold text-sm">Mama Georgette</div>
+              <div className="text-blue-300 text-xs">Gérante de boutiques · Yaoundé</div>
             </div>
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-            {/* Shop Name */}
-            <div>
-              <label htmlFor="shopName" className={labelStyle}>Nom de la boutique *</label>
-              <input
-                id="shopName"
-                type="text"
-                required
-                placeholder="Ex: Superette du Carrefour"
-                value={formData.shopName || ""}
-                onChange={update("shopName")}
-                className={inputStyle}
-              />
-            </div>
-
-            {/* Phone */}
-            <div>
-              <label htmlFor="phone" className={labelStyle}>Téléphone principal *</label>
-              <input
-                id="phone"
-                type="tel"
-                required
-                placeholder="+237 6XX XX XX XX"
-                value={formData.phone || ""}
-                onChange={update("phone")}
-                className={inputStyle}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-            {/* Region */}
-            <div>
-              <label htmlFor="region" className={labelStyle}>Région *</label>
-              <select
-                id="region"
-                required
-                value={formData.region || ""}
-                onChange={update("region")}
-                className={`${inputStyle} appearance-none`}
-              >
-                <option value="" disabled>Choisir une région...</option>
-                <option value="Adamaoua">Adamaoua</option>
-                <option value="Centre">Centre</option>
-                <option value="Est">Est</option>
-                <option value="Extrême-Nord">Extrême-Nord</option>
-                <option value="Littoral">Littoral</option>
-                <option value="Nord">Nord</option>
-                <option value="Nord-Ouest">Nord-Ouest</option>
-                <option value="Ouest">Ouest</option>
-                <option value="Sud">Sud</option>
-                <option value="Sud-Ouest">Sud-Ouest</option>
-              </select>
-            </div>
-
-            {/* City */}
-            <div>
-              <label htmlFor="city" className={labelStyle}>Ville *</label>
-              <input
-                id="city"
-                type="text"
-                required
-                placeholder="Ex: Douala"
-                value={formData.city || ""}
-                onChange={update("city")}
-                className={inputStyle}
-              />
-            </div>
-          </div>
-
-          <div className="mb-4">
-            {/* Sector */}
-            <div>
-              <label htmlFor="sector" className={labelStyle}>Secteur d'activité *</label>
-              <select
-                id="sector"
-                required
-                value={formData.sector || ""}
-                onChange={update("sector")}
-                className={`${inputStyle} appearance-none`}
-              >
-                <option value="" disabled>Choisir un secteur...</option>
-                <option value="Alimentaire">Alimentaire</option>
-                <option value="Boutique générale">Boutique générale</option>
-                <option value="Pharmacie">Pharmacie</option>
-                <option value="Cosmétique">Cosmétique</option>
-                <option value="Électronique">Électronique</option>
-                <option value="Téléphones & Accessoires">Téléphones & Accessoires</option>
-                <option value="Quincaillerie">Quincaillerie</option>
-                <option value="Restaurant">Restaurant</option>
-                <option value="Mode & Vêtements">Mode & Vêtements</option>
-                <option value="Services">Services</option>
-                <option value="Autre">Autre</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Password */}
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <div>
-              <label htmlFor="reg-password" className={labelStyle}>Mot de passe *</label>
-              <div className="relative">
-                <input
-                  id="reg-password"
-                  type={showPassword ? "text" : "password"}
-                  autoComplete="new-password"
-                  required
-                  placeholder="••••••••"
-                  value={formData.password}
-                  onChange={update("password")}
-                  className={`${inputStyle} pr-10`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-            </div>
-            <div>
-              <label htmlFor="confirm-password" className={labelStyle}>Confirmer *</label>
-              <input
-                id="confirm-password"
-                type={showPassword ? "text" : "password"}
-                autoComplete="new-password"
-                required
-                placeholder="••••••••"
-                value={formData.confirmPassword}
-                onChange={update("confirmPassword")}
-                className={inputStyle}
-              />
-            </div>
-          </div>
-
-          {/* Submit */}
-          <button
-            type="submit"
-            disabled={loading}
-            id="register-btn"
-            className={`w-full py-3 px-4 rounded-xl text-white font-bold text-sm flex items-center justify-center gap-2 transition-all ${
-              loading 
-                ? "bg-blue-400 cursor-not-allowed" 
-                : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:shadow-lg hover:shadow-blue-500/30 hover:-translate-y-0.5"
-            }`}
-          >
-            {loading ? (
-              <>
-                <Loader2 size={16} className="animate-spin" />
-                Création...
-              </>
-            ) : (
-              "Créer mon compte et ma boutique"
-            )}
-          </button>
-        </form>
-
-        <div className="flex items-center gap-3 my-6 text-sm text-gray-400 dark:text-gray-500">
-          <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700"></div>
-          ou
-          <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700"></div>
-        </div>
-
-        <p className="text-center text-sm text-gray-500 dark:text-gray-400">
-          Déjà un compte ?{" "}
-          <Link href="/login" className="text-blue-600 dark:text-blue-400 font-semibold hover:underline">
-            Se connecter
-          </Link>
-        </p>
-
-        <div className="mt-6 p-3 flex items-center gap-2 bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800/30 rounded-xl text-xs text-blue-600 dark:text-blue-400">
-          <Wifi size={14} className="flex-shrink-0" />
-          <span>Fonctionne hors ligne — Synchronisation automatique</span>
         </div>
       </div>
-      <style>{`@keyframes page-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }`}</style>
+
+      {/* ── RIGHT PANEL (FORM) ───────────────────────────────────────────── */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 h-screen overflow-y-auto">
+        <div className="w-full max-w-[480px] animate-[page-in_0.4s_ease-out]">
+          
+          <div className="lg:hidden flex items-center gap-3 mb-8">
+            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+            </div>
+            <span className="font-black text-2xl tracking-tight text-gray-900 dark:text-white">NOVAKAM</span>
+          </div>
+
+          <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2 tracking-tight">
+            Créer votre compte
+          </h1>
+          <p className="text-gray-500 dark:text-gray-400 mb-8">
+            Rejoignez des milliers de commerçants. Sans carte bancaire.
+          </p>
+
+          <div className="flex items-center gap-2 p-3 mb-8 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 rounded-xl text-xs font-medium text-blue-700 dark:text-blue-400">
+            <ShieldCheck size={16} className="text-blue-600 dark:text-blue-400" />
+            Mode d'évaluation locale actif — 100% sécurisé
+          </div>
+
+          <form onSubmit={handleRegister} className="space-y-6">
+            {error && (
+              <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800/50 rounded-xl text-red-600 dark:text-red-400 text-sm font-medium">
+                {error}
+              </div>
+            )}
+
+            {/* Plan Selector */}
+            <div className="mb-6">
+              <label className={labelStyle}>1. Choisissez votre abonnement</label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {PLANS.map((plan) => (
+                  <button
+                    key={plan.id}
+                    type="button"
+                    onClick={() => setSelectedPlan(plan.id)}
+                    className={`p-3 rounded-xl border text-left transition-all ${
+                      selectedPlan === plan.id
+                        ? "border-blue-600 bg-blue-50 dark:bg-blue-900/30 ring-1 ring-blue-600"
+                        : "border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-blue-300"
+                    }`}
+                  >
+                    <div className={`font-bold text-sm ${selectedPlan === plan.id ? "text-blue-700 dark:text-blue-400" : "text-gray-900 dark:text-white"}`}>
+                      {plan.name}
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">{plan.price}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <label className={labelStyle}>2. Vos informations</label>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <input type="text" required placeholder="Nom complet" value={formData.fullName} onChange={update("fullName")} className={inputStyle} />
+                </div>
+                <div>
+                  <input type="email" required placeholder="Adresse email" value={formData.email} onChange={update("email")} className={inputStyle} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <input type="text" required placeholder="Nom de la boutique" value={formData.shopName} onChange={update("shopName")} className={inputStyle} />
+                </div>
+                <div>
+                  <input type="tel" required placeholder="Téléphone (+237...)" value={formData.phone} onChange={update("phone")} className={inputStyle} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="col-span-1">
+                  <select required value={formData.region} onChange={update("region")} className={`${inputStyle} appearance-none bg-white`}>
+                    <option value="" disabled>Région...</option>
+                    <option value="Adamaoua">Adamaoua</option>
+                    <option value="Centre">Centre</option>
+                    <option value="Est">Est</option>
+                    <option value="Extrême-Nord">Extrême-Nord</option>
+                    <option value="Littoral">Littoral</option>
+                    <option value="Nord">Nord</option>
+                    <option value="Nord-Ouest">Nord-Ouest</option>
+                    <option value="Ouest">Ouest</option>
+                    <option value="Sud">Sud</option>
+                    <option value="Sud-Ouest">Sud-Ouest</option>
+                  </select>
+                </div>
+                <div className="col-span-1">
+                  <input type="text" required placeholder="Ville" value={formData.city} onChange={update("city")} className={inputStyle} />
+                </div>
+                <div className="col-span-1">
+                  <select required value={formData.sector} onChange={update("sector")} className={`${inputStyle} appearance-none bg-white`}>
+                    <option value="" disabled>Secteur...</option>
+                    <option value="Alimentaire">Alimentaire</option>
+                    <option value="Boutique générale">Boutique générale</option>
+                    <option value="Pharmacie">Pharmacie</option>
+                    <option value="Cosmétique">Cosmétique</option>
+                    <option value="Électronique">Électronique</option>
+                    <option value="Quincaillerie">Quincaillerie</option>
+                    <option value="Mode">Mode</option>
+                    <option value="Autre">Autre</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="relative">
+                  <input type={showPassword ? "text" : "password"} required placeholder="Mot de passe" value={formData.password} onChange={update("password")} className={`${inputStyle} pr-10`} />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+                <div>
+                  <input type={showPassword ? "text" : "password"} required placeholder="Confirmer mot de passe" value={formData.confirmPassword} onChange={update("confirmPassword")} className={inputStyle} />
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className={`w-full py-4 px-6 rounded-xl text-white font-bold text-base flex items-center justify-center gap-2 transition-all mt-4 ${
+                loading 
+                  ? "bg-blue-400 cursor-not-allowed" 
+                  : "bg-gray-900 hover:bg-black dark:bg-blue-600 dark:hover:bg-blue-700 shadow-xl shadow-blue-900/20 hover:-translate-y-1"
+              }`}
+            >
+              {loading ? <Loader2 size={20} className="animate-spin" /> : (
+                <>
+                  Créer ma boutique <ArrowRight size={18} />
+                </>
+              )}
+            </button>
+          </form>
+
+          <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-8">
+            Vous avez déjà un compte ?{" "}
+            <Link href="/login" className="text-gray-900 dark:text-white font-bold hover:underline">
+              Connectez-vous ici
+            </Link>
+          </p>
+
+        </div>
+      </div>
+      <style>{`@keyframes page-in { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }`}</style>
     </div>
   );
 }

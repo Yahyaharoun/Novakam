@@ -463,12 +463,13 @@ export default function LandingPage() {
                 {lang === "fr" ? "Installer l'application" : "Install App"}
               </button>
             ) : (
-              <Link
-                href="/"
+              <a
+                href="#install"
                 className="inline-flex items-center gap-2 px-8 py-4 bg-white dark:bg-white/10 hover:bg-gray-50 dark:hover:bg-white/20 text-gray-800 dark:text-white font-semibold rounded-xl border border-gray-200 dark:border-white/20 transition-all duration-300 text-base shadow-sm"
               >
-                {lang === "fr" ? "Voir la démo" : "View demo"}
-              </Link>
+                <Download size={18} className="text-blue-600 dark:text-blue-400" />
+                {lang === "fr" ? "Installer l'application" : "Install App"}
+              </a>
             )}
           </div>
 
@@ -717,7 +718,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── DOWNLOAD PWA ─────────────────────────────────────────────────────── */}
-      <section className="py-20 bg-gray-50 dark:bg-slate-900/80 border-t border-gray-100 dark:border-slate-800">
+      <section id="install" className="py-20 bg-gray-50 dark:bg-slate-900/80 border-t border-gray-100 dark:border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 dark:bg-blue-900/30 border border-blue-100 dark:border-blue-800/50 text-blue-600 dark:text-blue-400 font-medium text-sm mb-6">
             <Download size={16} className="text-blue-600 dark:text-blue-400" />
@@ -833,9 +834,7 @@ export default function LandingPage() {
               <h4 className="text-gray-900 dark:text-white text-sm font-semibold mb-4 uppercase tracking-wider">{lang === "fr" ? "Produit" : "Product"}</h4>
               <ul className="space-y-3 text-sm">
                 <li><a href="#fonctionnalites" className="hover:text-blue-600 dark:hover:text-white transition-colors duration-200">{lang === "fr" ? "Fonctionnalités" : "Features"}</a></li>
-                <li><Link href="#tarifs" className="hover:text-blue-600 dark:hover:text-white transition-colors duration-200">{lang === "fr" ? "Tarifs" : "Pricing"}</Link></li>
-                <li><Link href="/" className="hover:text-blue-600 dark:hover:text-white transition-colors duration-200">Changelog</Link></li>
-                <li><Link href="/" className="hover:text-blue-600 dark:hover:text-white transition-colors duration-200">{lang === "fr" ? "Feuille de route" : "Roadmap"}</Link></li>
+                <li><a href="#tarifs" className="hover:text-blue-600 dark:hover:text-white transition-colors duration-200">{lang === "fr" ? "Tarifs" : "Pricing"}</a></li>
               </ul>
             </div>
 
@@ -843,10 +842,8 @@ export default function LandingPage() {
             <div>
               <h4 className="text-gray-900 dark:text-white text-sm font-semibold mb-4 uppercase tracking-wider">Support</h4>
               <ul className="space-y-3 text-sm">
-                <li><Link href="/" className="hover:text-blue-600 dark:hover:text-white transition-colors duration-200">Documentation</Link></li>
-                <li><Link href="/" className="hover:text-blue-600 dark:hover:text-white transition-colors duration-200">{lang === "fr" ? "Centre d'aide" : "Help Center"}</Link></li>
-                <li><Link href="/" className="hover:text-blue-600 dark:hover:text-white transition-colors duration-200">{lang === "fr" ? "Contacter le support" : "Contact Support"}</Link></li>
-                <li><Link href="/" className="hover:text-blue-600 dark:hover:text-white transition-colors duration-200">{lang === "fr" ? "Statut du service" : "Service Status"}</Link></li>
+                <li><Link href="/contact" className="hover:text-blue-600 dark:hover:text-white transition-colors duration-200">{lang === "fr" ? "Nous contacter" : "Contact Us"}</Link></li>
+                <li><a href="#faq" className="hover:text-blue-600 dark:hover:text-white transition-colors duration-200">FAQ</a></li>
               </ul>
             </div>
 
@@ -854,10 +851,8 @@ export default function LandingPage() {
             <div>
               <h4 className="text-gray-900 dark:text-white text-sm font-semibold mb-4 uppercase tracking-wider">{lang === "fr" ? "Légal" : "Legal"}</h4>
               <ul className="space-y-3 text-sm">
-                <li><Link href="/" className="hover:text-blue-600 dark:hover:text-white transition-colors duration-200">{lang === "fr" ? "Conditions d'utilisation" : "Terms of Service"}</Link></li>
-                <li><Link href="/" className="hover:text-blue-600 dark:hover:text-white transition-colors duration-200">{lang === "fr" ? "Politique de confidentialité" : "Privacy Policy"}</Link></li>
-                <li><Link href="/" className="hover:text-blue-600 dark:hover:text-white transition-colors duration-200">{lang === "fr" ? "Mentions légales" : "Legal Notice"}</Link></li>
-                <li><Link href="/" className="hover:text-blue-600 dark:hover:text-white transition-colors duration-200">Cookies</Link></li>
+                <li><Link href="/terms" className="hover:text-blue-600 dark:hover:text-white transition-colors duration-200">{lang === "fr" ? "Conditions d'utilisation" : "Terms of Service"}</Link></li>
+                <li><Link href="/privacy" className="hover:text-blue-600 dark:hover:text-white transition-colors duration-200">{lang === "fr" ? "Politique de confidentialité" : "Privacy Policy"}</Link></li>
               </ul>
             </div>
           </div>
