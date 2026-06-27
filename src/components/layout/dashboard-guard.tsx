@@ -5,11 +5,12 @@ import { useRouter, usePathname } from "next/navigation";
 import { useAuthStore } from "@/lib/store/auth.store";
 import { Loader2 } from "lucide-react";
 import { hydrateLocalDB } from "@/lib/sync/hydration";
+import { LockScreen } from "@/components/auth/lock-screen";
 
 export function DashboardGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, currentShop, isSuperAdmin, isLoading } = useAuthStore();
+  const { user, currentShop, isSuperAdmin, isLoading, isLocked } = useAuthStore();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -44,6 +45,10 @@ export function DashboardGuard({ children }: { children: React.ReactNode }) {
         <Loader2 size={40} style={{ animation: "spin 1s linear infinite", color: "#3b82f6" }} />
       </div>
     );
+  }
+
+  if (isLocked) {
+    return <LockScreen />;
   }
 
   return <>{children}</>;

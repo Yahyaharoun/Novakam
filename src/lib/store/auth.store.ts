@@ -32,6 +32,8 @@ interface AuthState {
   shops: Shop[];
   subscription: Subscription | null;
   isLoading: boolean;
+  isLocked: boolean;
+  currentCashier: any | null;
 
   // Actions
   setUser: (user: User | null) => void;
@@ -48,6 +50,8 @@ interface AuthState {
   setShops: (shops: Shop[]) => void;
   setSubscription: (sub: Subscription | null) => void;
   setLoading: (loading: boolean) => void;
+  lockApp: () => void;
+  unlockApp: (cashier: any) => void;
   reset: () => void;
 }
 
@@ -61,6 +65,8 @@ const initialState = {
   shops: [],
   subscription: null,
   isLoading: true,
+  isLocked: false,
+  currentCashier: null,
 };
 
 export const useAuthStore = create<AuthState>()(
@@ -76,6 +82,8 @@ export const useAuthStore = create<AuthState>()(
       setShops: (shops) => set({ shops }),
       setSubscription: (subscription) => set({ subscription }),
       setLoading: (isLoading) => set({ isLoading }),
+      lockApp: () => set({ isLocked: true, currentCashier: null }),
+      unlockApp: (cashier) => set({ isLocked: false, currentCashier: cashier }),
       reset: () => set({ ...initialState, isLoading: false }),
     }),
     {
@@ -88,6 +96,8 @@ export const useAuthStore = create<AuthState>()(
         shops: state.shops,
         subscription: state.subscription,
         isSuperAdmin: state.isSuperAdmin,
+        isLocked: state.isLocked,
+        currentCashier: state.currentCashier,
       }),
     }
   )

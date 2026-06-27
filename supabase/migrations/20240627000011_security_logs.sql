@@ -80,6 +80,8 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Ajouter les Triggers sur les tables les plus sensibles
+
+
 DROP TRIGGER IF EXISTS audit_user_shops ON public.user_shops;
 CREATE TRIGGER audit_user_shops
     AFTER INSERT OR UPDATE OR DELETE ON public.user_shops

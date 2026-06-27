@@ -4,7 +4,7 @@
 
 -- 1. Create cash_register_sessions table
 CREATE TABLE cash_register_sessions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     shop_id UUID NOT NULL REFERENCES shops(id),
     cash_register_id UUID NOT NULL REFERENCES cash_registers(id),
     opened_by UUID NOT NULL REFERENCES users(id),
@@ -27,7 +27,7 @@ CREATE TABLE cash_register_sessions (
 CREATE TYPE cash_movement_type AS ENUM ('sale_income', 'expense', 'credit_payment', 'debt_payment', 'withdrawal', 'deposit');
 
 CREATE TABLE cash_movements (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     shop_id UUID NOT NULL REFERENCES shops(id),
     session_id UUID REFERENCES cash_register_sessions(id),
     type cash_movement_type NOT NULL,

@@ -40,9 +40,7 @@ CREATE POLICY "Super Admins can do everything on user_shops" ON user_shops
 CREATE POLICY "Super Admins can do everything on subscriptions" ON subscriptions
     FOR ALL USING (is_super_admin());
 
--- RLS sur roles
-CREATE POLICY "Super Admins can do everything on roles" ON roles
-    FOR ALL USING (is_super_admin());
+
 
 -- Note: Pour les autres tables liées à un shop_id (products, customers, sales, etc.),
 -- bien que le Super Admin pourrait vouloir y accéder pour le support,
@@ -63,7 +61,7 @@ CREATE POLICY "Super Admins can access all debts" ON debts FOR ALL USING (is_sup
 CREATE POLICY "Super Admins can access all product_variants" ON product_variants FOR ALL USING (is_super_admin());
 CREATE POLICY "Super Admins can access all product_batches" ON product_batches FOR ALL USING (is_super_admin());
 CREATE POLICY "Super Admins can access all stock_movements" ON stock_movements FOR ALL USING (is_super_admin());
-CREATE POLICY "Super Admins can access all treasury_entries" ON treasury_entries FOR ALL USING (is_super_admin());
+
 
 -- ============================================================
 -- 4. Seed d'un premier Super Admin (optionnel, pour tests)

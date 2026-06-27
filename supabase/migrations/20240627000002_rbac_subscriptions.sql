@@ -35,9 +35,19 @@ ALTER TYPE public.user_role ADD VALUE IF NOT EXISTS 'manager';
 ALTER TYPE public.user_role ADD VALUE IF NOT EXISTS 'storekeeper';
 
 -- ── Table: shops ──────────────────────────────────────────────────────────────
--- Mise à jour du champ plan pour utiliser le nouvel enum
-ALTER TABLE public.shops ALTER COLUMN plan TYPE public.plan USING plan::public.plan;
-ALTER TABLE public.shops ALTER COLUMN plan SET DEFAULT 'free';
+-- Ajout du champ plan avec le nouvel enum
+ALTER TABLE public.shops ADD COLUMN IF NOT EXISTS plan public.plan DEFAULT 'free';
+ALTER TABLE public.shops ADD COLUMN IF NOT EXISTS slug VARCHAR(255);
+ALTER TABLE public.shops ADD COLUMN IF NOT EXISTS country VARCHAR(100);
+ALTER TABLE public.shops ADD COLUMN IF NOT EXISTS city VARCHAR(100);
+ALTER TABLE public.shops ADD COLUMN IF NOT EXISTS phone VARCHAR(20);
+ALTER TABLE public.shops ADD COLUMN IF NOT EXISTS language VARCHAR(10) DEFAULT 'fr';
+ALTER TABLE public.shops ADD COLUMN IF NOT EXISTS timezone VARCHAR(50) DEFAULT 'Africa/Douala';
+ALTER TABLE public.shops ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+
+-- ── Table: user_shops ─────────────────────────────────────────────────────────
+-- Ajout de la colonne role (Enum) pour simplifier les requêtes RLS
+ALTER TABLE public.user_shops ADD COLUMN IF NOT EXISTS role public.user_role DEFAULT 'cashier';
 
 -- ── Table: subscriptions ──────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.subscriptions (
@@ -245,7 +255,7 @@ BEGIN
       v_max := v_limits.max_warehouses_per_shop;
     WHEN 'products' THEN
       SELECT COUNT(*) INTO v_count FROM public.products
-        WHERE shop_id = p_shop_id AND is_active = true;
+        WHERE shop_id = p_shop_id AND is_deleted = false;
       v_max := v_limits.max_products;
     ELSE RAISE EXCEPTION 'Unknown resource: %', p_resource;
   END CASE;
@@ -264,7 +274,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE FUNCTION public.get_user_shop_ids()
 RETURNS UUID[] AS $$
   SELECT ARRAY_AGG(shop_id) FROM public.user_shops
-  WHERE user_id = auth.uid() AND is_active = true;
+  WHERE user_id = auth.uid() AND is_deleted = false;
 $$ LANGUAGE sql SECURITY DEFINER STABLE;
 
 -- subscriptions
@@ -278,7 +288,7 @@ CREATE POLICY "owner_manage_subscription" ON public.subscriptions
   FOR ALL USING (
     shop_id IN (
       SELECT shop_id FROM public.user_shops
-      WHERE user_id = auth.uid() AND role = 'owner' AND is_active = true
+      WHERE user_id = auth.uid() AND role = 'owner' AND is_deleted = false
     )
   );
 
@@ -293,7 +303,7 @@ CREATE POLICY "owner_admin_manage_employees" ON public.employees
   FOR ALL USING (
     shop_id IN (
       SELECT shop_id FROM public.user_shops
-      WHERE user_id = auth.uid() AND role IN ('owner', 'admin') AND is_active = true
+      WHERE user_id = auth.uid() AND role IN ('owner', 'admin') AND is_deleted = false
     )
   );
 
@@ -308,7 +318,7 @@ CREATE POLICY "owner_admin_manage_registers" ON public.registers
   FOR ALL USING (
     shop_id IN (
       SELECT shop_id FROM public.user_shops
-      WHERE user_id = auth.uid() AND role IN ('owner', 'admin') AND is_active = true
+      WHERE user_id = auth.uid() AND role IN ('owner', 'admin') AND is_deleted = false
     )
   );
 
@@ -323,7 +333,7 @@ CREATE POLICY "owner_admin_manage_warehouses" ON public.warehouses
   FOR ALL USING (
     shop_id IN (
       SELECT shop_id FROM public.user_shops
-      WHERE user_id = auth.uid() AND role IN ('owner', 'admin') AND is_active = true
+      WHERE user_id = auth.uid() AND role IN ('owner', 'admin') AND is_deleted = false
     )
   );
 

@@ -8,7 +8,7 @@ ALTER TABLE products ADD COLUMN has_batches BOOLEAN DEFAULT false;
 
 -- 2. Create product_variants table
 CREATE TABLE product_variants (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     shop_id UUID NOT NULL REFERENCES shops(id),
     product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL, -- e.g., "Red - Size M"
@@ -25,7 +25,7 @@ CREATE TABLE product_variants (
 
 -- 3. Create product_batches table for expiration dates
 CREATE TABLE product_batches (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     shop_id UUID NOT NULL REFERENCES shops(id),
     product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     variant_id UUID REFERENCES product_variants(id) ON DELETE CASCADE,

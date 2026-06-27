@@ -23,7 +23,7 @@ ALTER TABLE public.user_shops DROP COLUMN IF EXISTS role_id;
 DROP TABLE IF EXISTS public.roles CASCADE;
 
 -- 2. Unification des fonctions de RLS
-DROP FUNCTION IF EXISTS public.get_user_shop_ids();
+DROP FUNCTION IF EXISTS public.get_user_shop_ids() CASCADE;
 
 CREATE OR REPLACE FUNCTION public.get_my_shops()
 RETURNS UUID[] AS $$

@@ -19,7 +19,7 @@ CREATE TYPE debt_status AS ENUM ('active', 'paid', 'overdue', 'cancelled');
 
 -- ROLES
 CREATE TABLE roles (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(50) UNIQUE NOT NULL,
     permissions JSONB DEFAULT '{}'::jsonb,
     is_deleted BOOLEAN DEFAULT false,
@@ -49,7 +49,7 @@ CREATE TABLE users (
 
 -- SHOPS
 CREATE TABLE shops (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
     owner_id UUID NOT NULL REFERENCES users(id),
     currency VARCHAR(10) DEFAULT 'XAF',
@@ -60,7 +60,7 @@ CREATE TABLE shops (
 
 -- USER_SHOPS (Liaison Utilisateurs <-> Boutiques <-> Rôles)
 CREATE TABLE user_shops (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id),
     shop_id UUID NOT NULL REFERENCES shops(id),
     role_id UUID NOT NULL REFERENCES roles(id),
@@ -72,7 +72,7 @@ CREATE TABLE user_shops (
 
 -- CATEGORIES
 CREATE TABLE categories (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     shop_id UUID NOT NULL REFERENCES shops(id),
     name VARCHAR(255) NOT NULL,
     is_deleted BOOLEAN DEFAULT false,
@@ -83,7 +83,7 @@ CREATE TABLE categories (
 
 -- PRODUCTS
 CREATE TABLE products (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     shop_id UUID NOT NULL REFERENCES shops(id),
     category_id UUID REFERENCES categories(id),
     name VARCHAR(500) NOT NULL,
@@ -100,7 +100,7 @@ CREATE TABLE products (
 
 -- CUSTOMERS
 CREATE TABLE customers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     shop_id UUID NOT NULL REFERENCES shops(id),
     name VARCHAR(255) NOT NULL,
     phone VARCHAR(20),
@@ -112,7 +112,7 @@ CREATE TABLE customers (
 
 -- SUPPLIERS
 CREATE TABLE suppliers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     shop_id UUID NOT NULL REFERENCES shops(id),
     name VARCHAR(255) NOT NULL,
     phone VARCHAR(20),
@@ -124,7 +124,7 @@ CREATE TABLE suppliers (
 
 -- CASH_REGISTERS (Caisses)
 CREATE TABLE cash_registers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     shop_id UUID NOT NULL REFERENCES shops(id),
     name VARCHAR(100) NOT NULL,
     balance DECIMAL(15,2) DEFAULT 0,
@@ -136,7 +136,7 @@ CREATE TABLE cash_registers (
 
 -- SALES
 CREATE TABLE sales (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     shop_id UUID NOT NULL REFERENCES shops(id),
     cash_register_id UUID REFERENCES cash_registers(id),
     customer_id UUID REFERENCES customers(id),
@@ -152,7 +152,7 @@ CREATE TABLE sales (
 
 -- SALE_ITEMS
 CREATE TABLE sale_items (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     shop_id UUID NOT NULL REFERENCES shops(id),
     sale_id UUID NOT NULL REFERENCES sales(id),
     product_id UUID REFERENCES products(id),
@@ -167,7 +167,7 @@ CREATE TABLE sale_items (
 
 -- STOCK_MOVEMENTS
 CREATE TABLE stock_movements (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     shop_id UUID NOT NULL REFERENCES shops(id),
     product_id UUID NOT NULL REFERENCES products(id),
     type stock_movement_type NOT NULL,
@@ -180,7 +180,7 @@ CREATE TABLE stock_movements (
 
 -- CREDITS (Dettes des clients envers la boutique)
 CREATE TABLE credits (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     shop_id UUID NOT NULL REFERENCES shops(id),
     customer_id UUID NOT NULL REFERENCES customers(id),
     sale_id UUID REFERENCES sales(id),
@@ -194,7 +194,7 @@ CREATE TABLE credits (
 
 -- DEBTS (Dettes de la boutique envers les fournisseurs)
 CREATE TABLE debts (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     shop_id UUID NOT NULL REFERENCES shops(id),
     supplier_id UUID NOT NULL REFERENCES suppliers(id),
     amount DECIMAL(15,2) NOT NULL,
@@ -207,7 +207,7 @@ CREATE TABLE debts (
 
 -- EXPENSES
 CREATE TABLE expenses (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     shop_id UUID NOT NULL REFERENCES shops(id),
     description VARCHAR(500) NOT NULL,
     amount DECIMAL(15,2) NOT NULL,
@@ -219,7 +219,7 @@ CREATE TABLE expenses (
 
 -- AUDIT_LOGS
 CREATE TABLE audit_logs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     shop_id UUID NOT NULL REFERENCES shops(id),
     user_id UUID REFERENCES users(id),
     table_name VARCHAR(100) NOT NULL,
@@ -334,7 +334,7 @@ DECLARE
 BEGIN
     FOR t_name IN 
         SELECT table_name FROM information_schema.columns 
-        WHERE table_schema = 'public' AND column_name = 'shop_id'
+        WHERE table_schema = 'public' AND column_name = 'shop_id' AND table_name != 'audit_logs'
     LOOP
         -- SELECT : L'utilisateur doit avoir accès à la boutique ET l'item ne doit pas être supprimé (soft delete)
         EXECUTE format('

@@ -1,5 +1,5 @@
 "use client";
-import { Bell, Moon, Sun, LogOut, Store, ChevronDown, Wifi, WifiOff, RefreshCw } from "lucide-react";
+import { Bell, Moon, Sun, LogOut, Store, ChevronDown, Wifi, WifiOff, RefreshCw, Lock } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore, useCurrentShop } from "@/lib/store/auth.store";
@@ -265,8 +265,8 @@ export function Header({ title }: { title?: string }) {
                   </div>
                 )}
                 <button
-                  id="logout-btn"
-                  onClick={handleLogout}
+                  id="lock-btn"
+                  onClick={() => useAuthStore.getState().lockApp()}
                   style={{
                     width: "100%",
                     padding: "10px 14px",
@@ -278,12 +278,12 @@ export function Header({ title }: { title?: string }) {
                     alignItems: "center",
                     gap: "8px",
                     fontSize: "13px",
-                    color: "#ef4444",
+                    color: "var(--text-primary)",
                     fontWeight: "500",
                   }}
                 >
-                  <LogOut size={14} />
-                  {t("auth.logout")}
+                  <Lock size={14} />
+                  Verrouiller la caisse
                 </button>
               </div>
             </>

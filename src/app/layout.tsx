@@ -49,23 +49,7 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
       </head>
       <body className="font-inter" suppressHydrationWarning>
-          <script
-            dangerouslySetInnerHTML={{
-              __html: `
-                if ('serviceWorker' in navigator) {
-                  navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                    for(let registration of registrations) {
-                      registration.unregister();
-                    }
-                  });
-                  // Force reload if we find a stuck worker
-                  navigator.serviceWorker.addEventListener('controllerchange', () => {
-                    window.location.reload();
-                  });
-                }
-              `,
-            }}
-          />
+
         <AppProviders>{children}</AppProviders>
       </body>
     </html>

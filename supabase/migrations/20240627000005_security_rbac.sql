@@ -6,31 +6,31 @@
 TRUNCATE TABLE roles CASCADE; -- Warning: This resets user_shops links in a real production environment, but okay for setup phase.
 
 INSERT INTO roles (id, name, permissions) VALUES 
-(uuid_generate_v4(), 'owner', '{
+(gen_random_uuid(), 'owner', '{
   "pos": { "read": true, "write": true },
   "inventory": { "read": true, "write": true },
   "finance": { "read": true, "write": true },
   "settings": { "read": true, "write": true }
 }'),
-(uuid_generate_v4(), 'admin', '{
+(gen_random_uuid(), 'admin', '{
   "pos": { "read": true, "write": true },
   "inventory": { "read": true, "write": true },
   "finance": { "read": true, "write": true },
   "settings": { "read": true, "write": false }
 }'),
-(uuid_generate_v4(), 'cashier', '{
+(gen_random_uuid(), 'cashier', '{
   "pos": { "read": true, "write": true },
   "inventory": { "read": true, "write": false },
   "finance": { "read": false, "write": false },
   "settings": { "read": false, "write": false }
 }'),
-(uuid_generate_v4(), 'stock_manager', '{
+(gen_random_uuid(), 'stock_manager', '{
   "pos": { "read": false, "write": false },
   "inventory": { "read": true, "write": true },
   "finance": { "read": false, "write": false },
   "settings": { "read": false, "write": false }
 }'),
-(uuid_generate_v4(), 'accountant', '{
+(gen_random_uuid(), 'accountant', '{
   "pos": { "read": true, "write": false },
   "inventory": { "read": true, "write": false },
   "finance": { "read": true, "write": true },

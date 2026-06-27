@@ -93,13 +93,13 @@ CREATE POLICY "sales_delete_strict" ON public.sales
 DROP POLICY IF EXISTS "products_insert" ON public.products;
 CREATE POLICY "products_insert_strict" ON public.products
     FOR INSERT WITH CHECK (
-        has_role(shop_id, ARRAY['owner', 'manager', 'warehouse']::user_role[])
+        has_role(shop_id, ARRAY['owner', 'manager', 'storekeeper']::user_role[])
     );
 
 DROP POLICY IF EXISTS "products_update" ON public.products;
 CREATE POLICY "products_update_strict" ON public.products
     FOR UPDATE USING (
-        has_role(shop_id, ARRAY['owner', 'manager', 'warehouse']::user_role[])
+        has_role(shop_id, ARRAY['owner', 'manager', 'storekeeper']::user_role[])
     );
 
 DROP POLICY IF EXISTS "products_delete" ON public.products;

@@ -103,7 +103,6 @@ function LoginForm() {
       authStore.setShops([userShop as any]);
       authStore.setCurrentShop(userShop as any, "owner");
       
-      document.cookie = "novakam-local-session=true; path=/; max-age=86400";
       toast.success(`Bienvenue dans ${userShop.name} !`);
       router.push("/dashboard");
 
