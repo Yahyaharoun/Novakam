@@ -17,6 +17,7 @@ import { getDB } from "@/lib/db/schema";
 import toast from "react-hot-toast";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { PlanFeatureGuard } from "@/lib/rbac/guard";
 
 const getReportCards = (t: any) => [
   {
@@ -153,6 +154,7 @@ export default function ReportsPage() {
   }
 
   return (
+    <PlanFeatureGuard feature="has_advanced_reports">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -311,5 +313,6 @@ export default function ReportsPage() {
         </div>
       </div>
     </div>
+    </PlanFeatureGuard>
   );
 }

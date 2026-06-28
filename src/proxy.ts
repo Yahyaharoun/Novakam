@@ -26,6 +26,17 @@ function isPublicRoute(pathname: string): boolean {
   return PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
+// Routes nécessitant un plan spécifique
+const PLAN_PROTECTED_ROUTES: Record<string, string[]> = {
+  "/reports": ["starter", "business", "pro", "enterprise"],
+  "/reports/advanced": ["business", "pro", "enterprise"],
+  "/finance/credits": ["business", "pro", "enterprise"],
+  "/finance/expenses": ["business", "pro", "enterprise"],
+  "/finance/accounting": ["pro", "enterprise"],
+  "/settings/api": ["pro", "enterprise"],
+  "/settings/audit": ["pro", "enterprise"],
+};
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -76,20 +87,36 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Vérification RBAC pour les routes protégées par rôle
-  const protectedRoles = ROLE_PROTECTED_ROUTES[pathname];
-  if (protectedRoles) {
-    // Récupérer le rôle de l'utilisateur pour la boutique (simplifié)
-    const { data: userShop } = await supabase
-      .from("user_shops")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("is_active", true)
-      .maybeSingle();
+  // Vérification RBAC et PLan pour les routes protégées
+  const protectedRoles = ROLE_PROTECTED_ROUTES[pathname] || null;
+  const protectedPlans = PLAN_PROTECTED_ROUTES[pathname] || null;
 
-    if (!userShop || !protectedRoles.includes((userShop as any).role)) {
-      // Rediriger vers une page non autorisée
+  if (protectedRoles || protectedPlans) {
+    // Récupérer le rôle de l'utilisateur ET le plan de la boutique
+    const { data: userShops } = await supabase
+      .from("user_shops")
+      .select("role, shops(plan)")
+      .eq("user_id", user.id)
+      .eq("is_deleted", false)
+      .limit(1);
+
+    const userShop = userShops && userShops.length > 0 ? userShops[0] : null;
+
+    if (!userShop) {
       return NextResponse.redirect(new URL("/unauthorized", request.url));
+    }
+
+    const role = (userShop as any).role;
+    const plan = (userShop as any).shops?.plan || "free";
+
+    // Vérification Rôle
+    if (protectedRoles && !protectedRoles.includes(role)) {
+      return NextResponse.redirect(new URL("/unauthorized", request.url));
+    }
+
+    // Vérification Plan
+    if (protectedPlans && !protectedPlans.includes(plan)) {
+      return NextResponse.redirect(new URL("/unauthorized?reason=plan", request.url));
     }
   }
 

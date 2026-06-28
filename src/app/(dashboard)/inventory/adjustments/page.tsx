@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ArrowLeft, Search, Save, Package } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useProducts, useProductByScanner } from "@/lib/hooks/use-products";
+import { useInventory } from "@/lib/hooks/use-inventory";
 import { useBarcodeScanner } from "@/lib/hooks/use-barcode-scanner";
 import { formatCurrency } from "@/lib/utils/currency";
 import toast from "react-hot-toast";
@@ -11,7 +12,8 @@ import toast from "react-hot-toast";
 export default function StockAdjustmentsPage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
-  const { products, isLoading, adjustStock } = useProducts({ search, isActive: true });
+  const { products, isLoading } = useProducts({ search, isActive: true });
+  const { adjustStock } = useInventory();
   const getProductByScanner = useProductByScanner();
   
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
@@ -59,7 +61,11 @@ export default function StockAdjustmentsPage() {
     }
 
     try {
-      await adjustStock(selectedProduct.id, delta, notes);
+      await adjustStock({
+        product_id: selectedProduct.id,
+        real_quantity: Number(realQuantity),
+        reason: notes || (adjustmentType === "loss" ? "Perte déclarée" : "Ajustement d'inventaire")
+      });
       toast.success("Ajustement enregistré avec succès !");
       setSelectedProduct(null);
       setRealQuantity("");
@@ -146,6 +152,17 @@ export default function StockAdjustmentsPage() {
             <div style={{ textAlign: "center", padding: "40px 0", color: "var(--text-muted)" }}>
               <Package size={32} style={{ margin: "0 auto 12px", opacity: 0.3 }} />
               <p style={{ fontSize: "13px" }}>Veuillez sélectionner un produit à ajuster.</p>
+            </div>
+          ) : selectedProduct.has_variants || selectedProduct.has_batches ? (
+            <div style={{ textAlign: "center", padding: "40px 0", color: "var(--text-warning)" }}>
+              <Package size={32} style={{ margin: "0 auto 12px", opacity: 0.5 }} />
+              <p style={{ fontSize: "14px", fontWeight: "600", marginBottom: "8px" }}>Produit complexe</p>
+              <p style={{ fontSize: "13px", color: "var(--text-secondary)", marginBottom: "16px" }}>
+                Ce produit utilise des variantes ou des lots. Veuillez ajuster le stock de la variante ou du lot spécifique directement depuis sa fiche détaillée.
+              </p>
+              <button onClick={() => router.push(`/products/${selectedProduct.id}`)} className="btn btn-outline btn-sm">
+                Ouvrir la fiche produit
+              </button>
             </div>
           ) : (
             <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>

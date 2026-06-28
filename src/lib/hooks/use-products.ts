@@ -78,8 +78,16 @@ export function useProducts(filter?: ProductFilter) {
       const newId = uuid();
       const ref = await generateInternalRef(data.shop_id);
       
+      let totalStock = data.stock_quantity || 0;
+      if (data.has_variants && variants?.length) {
+        totalStock = variants.reduce((acc, v) => acc + (Number(v.stock_quantity) || 0), 0);
+      } else if (data.has_batches && batches?.length) {
+        totalStock = batches.reduce((acc, b) => acc + (Number(b.stock_quantity) || 0), 0);
+      }
+
       const product: LocalProduct = {
         ...data,
+        stock_quantity: totalStock,
         id: newId,
         internal_reference: ref,
         qr_code: newId, // The QR code content is simply the product ID
@@ -143,13 +151,131 @@ export function useProducts(filter?: ProductFilter) {
 
   // ── UPDATE ────────────────────────────────────────
   const updateProduct = useCallback(
-    async (id: string, changes: Partial<LocalProduct>) => {
+    async (
+      id: string,
+      changes: Partial<LocalProduct>,
+      variants?: any[],
+      batches?: any[]
+    ) => {
       const db = getDB();
       const now = new Date().toISOString();
+      let totalStock = changes.stock_quantity;
+      if (changes.has_variants !== false && variants !== undefined) {
+        totalStock = variants.reduce((acc, v) => acc + (Number(v.stock_quantity) || 0), 0);
+      } else if (changes.has_batches !== false && batches !== undefined) {
+        totalStock = batches.reduce((acc, b) => acc + (Number(b.stock_quantity) || 0), 0);
+      }
+
       const updated = { ...changes, updated_at: now, sync_status: "pending" as const };
-      await db.products.update(id, updated);
-      const full = await db.products.get(id);
-      if (full) await enqueueSync("products", id, "update", full);
+      if (totalStock !== undefined) {
+        updated.stock_quantity = totalStock;
+      }
+      
+      await db.transaction("rw", [db.products, db.productVariants, db.productBatches, db.syncQueue], async () => {
+        await db.products.update(id, updated);
+        const full = await db.products.get(id);
+        if (full) await enqueueSync("products", id, "update", full);
+
+        // Update variants
+        if (variants !== undefined) {
+          const existingVariants = await db.productVariants.where("product_id").equals(id).toArray();
+          const incomingIds = variants.map(v => v.id).filter(Boolean);
+          
+          // Mark deleted variants as is_active=false (soft delete)
+          for (const ev of existingVariants) {
+            if (!incomingIds.includes(ev.id)) {
+              await db.productVariants.update(ev.id, { is_active: false, updated_at: now, sync_status: "pending" });
+              const fullV = await db.productVariants.get(ev.id);
+              if (fullV) await enqueueSync("product_variants", ev.id, "update", fullV);
+            }
+          }
+
+          // Insert or update incoming variants
+          if (updated.has_variants !== false) {
+            for (const v of variants) {
+              if (v.id) {
+                await db.productVariants.update(v.id, {
+                  name: v.name,
+                  sku: v.sku || undefined,
+                  barcode: v.barcode || undefined,
+                  purchase_price: v.purchase_price,
+                  selling_price: v.selling_price,
+                  stock_quantity: v.stock_quantity,
+                  updated_at: now,
+                  sync_status: "pending"
+                });
+                const fullV = await db.productVariants.get(v.id);
+                if (fullV) await enqueueSync("product_variants", v.id, "update", fullV);
+              } else {
+                const newVariant: LocalProductVariant = {
+                  id: uuid(),
+                  shop_id: full!.shop_id,
+                  product_id: id,
+                  name: v.name,
+                  sku: v.sku || undefined,
+                  barcode: v.barcode || undefined,
+                  purchase_price: v.purchase_price,
+                  selling_price: v.selling_price,
+                  stock_quantity: v.stock_quantity,
+                  is_active: true,
+                  sync_status: "pending",
+                  created_at: now,
+                  updated_at: now,
+                };
+                await db.productVariants.add(newVariant);
+                await enqueueSync("product_variants", newVariant.id, "create", newVariant);
+              }
+            }
+          }
+        }
+
+        // Update batches
+        if (batches !== undefined) {
+          const existingBatches = await db.productBatches.where("product_id").equals(id).toArray();
+          const incomingIds = batches.map(b => b.id).filter(Boolean);
+          
+          // Soft delete missing batches
+          for (const eb of existingBatches) {
+            if (!incomingIds.includes(eb.id)) {
+              await db.productBatches.update(eb.id, { is_active: false, updated_at: now, sync_status: "pending" });
+              const fullB = await db.productBatches.get(eb.id);
+              if (fullB) await enqueueSync("product_batches", eb.id, "update", fullB);
+            }
+          }
+
+          // Insert or update incoming batches
+          if (updated.has_batches !== false && updated.has_variants === false) {
+            for (const b of batches) {
+              if (b.id) {
+                await db.productBatches.update(b.id, {
+                  batch_number: b.batch_number,
+                  expiry_date: b.expiry_date || undefined,
+                  stock_quantity: b.stock_quantity,
+                  updated_at: now,
+                  sync_status: "pending"
+                });
+                const fullB = await db.productBatches.get(b.id);
+                if (fullB) await enqueueSync("product_batches", b.id, "update", fullB);
+              } else {
+                const newBatch: LocalProductBatch = {
+                  id: uuid(),
+                  shop_id: full!.shop_id,
+                  product_id: id,
+                  batch_number: b.batch_number,
+                  expiry_date: b.expiry_date || undefined,
+                  stock_quantity: b.stock_quantity,
+                  is_active: true,
+                  sync_status: "pending",
+                  created_at: now,
+                  updated_at: now,
+                };
+                await db.productBatches.add(newBatch);
+                await enqueueSync("product_batches", newBatch.id, "create", newBatch);
+              }
+            }
+          }
+        }
+      });
       await load();
     },
     [load]
@@ -193,14 +319,22 @@ export function useProducts(filter?: ProductFilter) {
 
 // Hook pour un seul produit (par id ou barcode)
 export function useProduct(id?: string) {
-  const [product, setProduct] = useState<LocalProduct | null>(null);
+  const [product, setProduct] = useState<LocalProduct & { variants?: LocalProductVariant[], batches?: LocalProductBatch[] } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (!id) { setIsLoading(false); return; }
     const db = getDB();
-    db.products.get(id).then((p) => {
-      setProduct(p ?? null);
+    Promise.all([
+      db.products.get(id),
+      db.productVariants.where("product_id").equals(id).toArray(),
+      db.productBatches.where("product_id").equals(id).toArray()
+    ]).then(([p, variants, batches]) => {
+      if (p) {
+        setProduct({ ...p, variants, batches });
+      } else {
+        setProduct(null);
+      }
       setIsLoading(false);
     });
   }, [id]);

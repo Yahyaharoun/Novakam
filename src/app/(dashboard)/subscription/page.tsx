@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 import {
-  CreditCard, Check, Star, Zap, TrendingUp, Crown, Building2,
-  Users, ShoppingBag, Package, Store, BarChart2, ArrowRight,
-  Calendar, AlertCircle, CheckCircle2, Loader2
+  Check, Star, Zap, TrendingUp, Crown,
+  Users, ShoppingBag, Package, Store, ArrowRight,
+  Calendar, AlertCircle, CheckCircle2, Loader2, History
 } from "lucide-react";
 import { useAuthStore } from "@/lib/store/auth.store";
 import { useI18nStore } from "@/lib/store/i18n.store";
@@ -14,6 +14,7 @@ import { useRBAC } from "@/lib/rbac/hooks";
 import { getDB } from "@/lib/db/schema";
 import type { Plan, UserRole } from "@/lib/supabase/database.types";
 import toast from "react-hot-toast";
+import { activateCode, getSubscriptionHistory } from "@/lib/subscriptions/server/actions";
 
 const PLAN_ORDER: Plan[] = ["free", "starter", "business", "pro", "enterprise"];
 
@@ -58,6 +59,7 @@ export default function SubscriptionPage() {
   const [upgrading, setUpgrading] = useState<Plan | null>(null);
   const [activationCode, setActivationCode] = useState("");
   const [activatingCode, setActivatingCode] = useState(false);
+  const [history, setHistory] = useState<any[]>([]);
 
   const currentPlan = (shop?.plan ?? "free") as Plan;
   const limits = PLAN_LIMITS[currentPlan];
@@ -110,7 +112,13 @@ export default function SubscriptionPage() {
     }
   }, [shop?.id]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => {
+    loadData();
+    // Load history
+    if (shop?.id && !shop.id.startsWith('mock-')) {
+      getSubscriptionHistory(shop.id).then(setHistory).catch(() => {});
+    }
+  }, [loadData]);
 
   async function handleUpgrade(targetPlan: Plan) {
     if (!can("manage:subscription")) {
@@ -160,33 +168,31 @@ export default function SubscriptionPage() {
     setActivatingCode(true);
     try {
       if (shop!.id.startsWith('mock-')) {
-        // Simulation en mode mock
         toast.success("Code activé en mode démo !");
         setActivationCode("");
       } else {
-        const res = await fetch("/api/subscriptions/activate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ code, shop_id: shop!.id })
-        });
-        const data = await res.json();
+        const result = await activateCode(code, shop!.id);
         
-        if (!res.ok || data.error) {
-          toast.error(data.error || "Erreur lors de l'activation du code.");
+        if (!result.success) {
+          toast.error(result.message);
         } else {
-          toast.success(data.message || "Licence activée avec succès !");
+          toast.success(result.message);
           setActivationCode("");
           await loadData();
-          
+          // Refresh history
+          getSubscriptionHistory(shop!.id).then(setHistory).catch(() => {});
           // Force update shop plan in auth store
-          useAuthStore.getState().setCurrentShop({
-            ...shop!,
-            plan: data.newPlan
-          }, role as any);
+          if (result.newPlan) {
+            useAuthStore.getState().setCurrentShop({
+              ...shop!,
+              plan: result.newPlan as Plan,
+            }, role as UserRole);
+          }
         }
       }
-    } catch (err: any) {
-      toast.error(err.message || "Erreur lors de l'activation.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erreur lors de l'activation.";
+      toast.error(msg);
     } finally {
       setActivatingCode(false);
     }
@@ -451,6 +457,32 @@ export default function SubscriptionPage() {
           })}
         </div>
       </div>
+
+      {/* Historique des activations */}
+      {history.length > 0 && (
+        <div className="p-6 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50">
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-4 flex items-center gap-2">
+            <History size={16} />
+            Historique des activations
+          </h3>
+          <div className="space-y-2">
+            {history.map((item: any) => (
+              <div key={item.id} className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-700/50 last:border-0 text-xs">
+                <div className="flex items-center gap-3">
+                  <span className="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-bold uppercase">
+                    {item.plan}
+                  </span>
+                  <span className="text-slate-500 dark:text-slate-400 capitalize">{item.action}</span>
+                </div>
+                <div className="flex items-center gap-4 text-slate-500 dark:text-slate-400">
+                  <span>{new Date(item.valid_from).toLocaleDateString("fr-FR")} → {new Date(item.valid_to).toLocaleDateString("fr-FR")}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

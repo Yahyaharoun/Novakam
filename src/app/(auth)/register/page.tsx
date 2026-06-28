@@ -24,6 +24,7 @@ export default function RegisterPage() {
     email: "",
     password: "",
     confirmPassword: "",
+    pin: "",
     shopName: "",
     phone: "",
     region: "",
@@ -57,90 +58,91 @@ export default function RegisterPage() {
       setError("Le mot de passe doit faire au moins 6 caractères.");
       return;
     }
+    if (formData.pin.length !== 4 || isNaN(Number(formData.pin))) {
+      setError("Le code PIN doit comporter exactement 4 chiffres.");
+      return;
+    }
 
     setLoading(true);
     
     try {
       const supabase = createClient();
       
-      // 1. Inscription Utilisateur (Supabase Auth)
+      // 1. Inscription — on passe TOUTES les infos dans les métadonnées
+      //    Le trigger handle_new_auth_user les lit et crée la boutique complète :
+      //    public.users + public.shops + public.user_shops + public.subscriptions
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
           data: {
             full_name: formData.fullName,
+            shop_name: formData.shopName || "Ma Boutique",
+            city: formData.city,
+            phone: formData.phone,
+            country: "Cameroun",
+            plan: selectedPlan,
+            region: formData.region,
+            sector: formData.sector,
+            pin: formData.pin,
           }
         }
       });
 
       if (authError) throw authError;
 
-      // Si Supabase demande une confirmation d'email (pas de session immédiate)
+      // 2a. Si Supabase demande une confirmation d'email (pas de session immédiate)
+      //     Le trigger a déjà créé la boutique côté serveur avec toutes les infos.
       if (authData.user && !authData.session) {
         setSuccess(true);
         setLoading(false);
         return; 
       }
 
-      // Si la session est active (confirmation email désactivée)
+      // 2b. Si la session est active (email confirmation désactivée dans Supabase)
       if (authData.user && authData.session) {
-        // 2. Création de la boutique dans la table `shops`
-        const slug = (formData.shopName || "Ma Boutique")
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, "-")
-          .replace(/^-|-$/g, "");
+        // Laisser le temps au trigger de finir (il est asynchrone côté Postgres)
+        await new Promise((r) => setTimeout(r, 1500));
 
-        const { data: shopData, error: shopError } = await (supabase
-          .from("shops") as any)
-          .insert({
-            name: formData.shopName,
-            slug: slug,
-            owner_id: authData.user.id,
-            plan: selectedPlan as any,
-            country: "Cameroun",
-            city: formData.city,
-            phone: formData.phone,
-            currency: "XAF",
-            language: "fr",
-            timezone: "Africa/Douala",
-            is_active: true
-          })
-          .select()
-          .single();
+        // 3. Lire la boutique créée par le trigger dans la base de données
+        const { data: shops, error: shopsError } = await supabase
+          .from("shops")
+          .select("*")
+          .eq("owner_id", authData.user.id)
+          .order("created_at", { ascending: false })
+          .limit(1);
 
-        if (shopError) {
-          // Si le slug existe déjà (unique constraint), on prévient
-          if (shopError.code === '23505') {
-            throw new Error("Ce nom de boutique est déjà utilisé, veuillez en choisir un autre.");
-          }
-          throw shopError;
+        if (shopsError) throw shopsError;
+
+        if (!shops || shops.length === 0) {
+          throw new Error("Erreur : La boutique n'a pas pu être créée automatiquement. Veuillez réessayer.");
         }
 
-        // 3. Mise à jour du store Zustand
+        const shopData = shops[0];
+
+        // 4. Mise à jour du store Zustand
         useAuthStore.getState().setUser(authData.user);
-        if (shopData) {
-          useAuthStore.getState().setShops([shopData as any]);
-          useAuthStore.getState().setCurrentShop(shopData as any, "owner");
-        }
+        useAuthStore.getState().setShops([shopData as never]);
+        useAuthStore.getState().setCurrentShop(shopData as never, "owner");
 
-        // On purge l'ancien cookie de session locale (POS)
+        // Purger l'ancien cookie de session locale (POS)
         document.cookie = "novakam-local-session=; path=/; max-age=0";
 
-        // On arrête le loader AVANT de changer de page pour éviter que le bouton tourne pendant la compilation Next.js
         setLoading(false);
         router.push("/dashboard");
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
+      const message = err instanceof Error ? err.message : String(err);
       
-      // Gestion des erreurs spécifiques Supabase
-      if (err.message && err.message.includes("Failed to fetch")) {
-        setError("Erreur réseau : Impossible de joindre les serveurs sécurisés. Vérifiez votre connexion.");
-      } else if (err.message && err.message.includes("User already registered")) {
+      if (message.includes("Failed to fetch")) {
+        setError("Erreur réseau : Impossible de joindre les serveurs. Vérifiez votre connexion.");
+      } else if (message.includes("User already registered")) {
         setError("Cette adresse email est déjà utilisée. Veuillez vous connecter.");
+      } else if (message.includes("Email rate limit exceeded")) {
+        setError("Trop de tentatives. Veuillez patienter quelques minutes.");
       } else {
-        setError(err.message || "Une erreur est survenue lors de la création du compte.");
+        setError(message || "Une erreur est survenue lors de la création du compte.");
       }
       setLoading(false);
     }
@@ -322,13 +324,19 @@ export default function RegisterPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="relative">
                   <input type={showPassword ? "text" : "password"} required placeholder="Mot de passe" value={formData.password} onChange={update("password")} className={`${inputStyle} pr-10`} />
-                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
                 <div>
-                  <input type={showPassword ? "text" : "password"} required placeholder="Confirmer mot de passe" value={formData.confirmPassword} onChange={update("confirmPassword")} className={inputStyle} />
+                  <input type={showPassword ? "text" : "password"} required placeholder="Confirmer" value={formData.confirmPassword} onChange={update("confirmPassword")} className={inputStyle} />
                 </div>
+              </div>
+              
+              <div className="mt-4">
+                <label className={labelStyle}>3. Code PIN pour la caisse</label>
+                <input type="text" maxLength={4} pattern="[0-9]{4}" required placeholder="Ex: 1234 (4 chiffres)" value={formData.pin} onChange={update("pin")} className={inputStyle} />
+                <p className="text-xs text-gray-500 mt-1">Ce code vous servira à déverrouiller la caisse (Mode POS).</p>
               </div>
             </div>
 

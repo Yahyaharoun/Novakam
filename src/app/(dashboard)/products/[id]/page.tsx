@@ -41,7 +41,9 @@ export default function ProductDetailPage() {
         is_active: data.is_active,
         track_stock: data.track_stock,
         allow_negative: data.allow_negative,
-      });
+        has_variants: data.has_variants,
+        has_batches: data.has_batches,
+      }, data.variants, data.batches);
       toast.success("Produit modifié avec succès");
       router.push("/products");
     } catch {

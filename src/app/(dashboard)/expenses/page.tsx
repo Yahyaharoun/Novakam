@@ -1,4 +1,5 @@
 "use client";
+import { PlanFeatureGuard } from "@/lib/rbac/guard";
 
 import { useState } from "react";
 import { Plus, Receipt, Banknote, CreditCard, Smartphone } from "lucide-react";
@@ -71,6 +72,7 @@ export default function ExpensesPage() {
   };
 
   return (
+    <PlanFeatureGuard feature="has_credits">
     <div className="page-enter" style={{ padding: "24px", maxWidth: "800px", margin: "0 auto" }}>
       
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "24px" }}>
@@ -207,6 +209,7 @@ export default function ExpensesPage() {
         )}
       </div>
     </div>
+    </PlanFeatureGuard>
   );
 }
 

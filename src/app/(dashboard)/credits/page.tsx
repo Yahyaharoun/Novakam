@@ -1,4 +1,5 @@
 "use client";
+import { PlanFeatureGuard } from "@/lib/rbac/guard";
 import { useState } from "react";
 import {
   CreditCard,
@@ -81,6 +82,7 @@ export default function CreditsPage() {
   };
 
   return (
+    <PlanFeatureGuard feature="has_credits">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -379,5 +381,6 @@ export default function CreditsPage() {
       )}
 
     </div>
+    </PlanFeatureGuard>
   );
 }

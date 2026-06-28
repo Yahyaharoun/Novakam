@@ -6,6 +6,9 @@ import { StockBadge } from "@/components/products/stock-badge";
 import { formatCurrency } from "@/lib/utils/currency";
 import { formatDate } from "@/lib/utils/date";
 import Link from "next/link";
+import { useLiveQuery } from "dexie-react-hooks";
+import { getDB } from "@/lib/db/schema";
+import { useAuthStore } from "@/lib/store/auth.store";
 
 import { useI18nStore } from "@/lib/store/i18n.store";
 
@@ -13,9 +16,27 @@ type StockFilter = "all" | "low" | "out" | "ok";
 
 export default function InventoryPage() {
   const { t } = useI18nStore();
+  const shop = useAuthStore(s => s.currentShop);
   const [filter, setFilter] = useState<StockFilter>("all");
 
   const { products, isLoading, lowStockCount } = useProducts({ isActive: true });
+  
+  const expiringBatches = useLiveQuery(async () => {
+    if (!shop?.id) return 0;
+    const db = getDB();
+    const today = new Date();
+    const nextMonth = new Date();
+    nextMonth.setDate(today.getDate() + 30);
+    const todayStr = today.toISOString().split("T")[0];
+    const nextMonthStr = nextMonth.toISOString().split("T")[0];
+
+    const batches = await db.productBatches
+      .where("shop_id")
+      .equals(shop.id)
+      .filter(b => b.is_active && b.stock_quantity > 0 && !!b.expiry_date && b.expiry_date >= todayStr && b.expiry_date <= nextMonthStr)
+      .count();
+    return batches;
+  }, [shop?.id]) ?? 0;
 
   const outOfStock     = products.filter((p) => p.track_stock && p.stock_quantity <= 0);
   const lowStock       = products.filter((p) => p.track_stock && p.stock_quantity > 0 && p.stock_quantity <= p.min_stock);
@@ -99,16 +120,16 @@ export default function InventoryPage() {
           </div>
         </div>
 
-        <div className="kpi-card">
+        <div className="kpi-card" style={{ borderColor: expiringBatches > 0 ? "rgba(245,158,11,0.3)" : undefined }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <div>
-              <p style={{ fontSize: "12px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "6px" }}>{t("inventory.ok_stock")}</p>
-              <p style={{ fontSize: "22px", fontWeight: "700", color: "#10b981" }}>
-                {healthy.length}
+              <p style={{ fontSize: "12px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "6px" }}>Péremptions (&lt; 30j)</p>
+              <p style={{ fontSize: "22px", fontWeight: "700", color: expiringBatches > 0 ? "#f59e0b" : "var(--text-primary)" }}>
+                {expiringBatches} lots
               </p>
             </div>
-            <div style={{ width: "38px", height: "38px", background: "linear-gradient(135deg,#059669,#10b981)", borderRadius: "9px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <TrendingUp size={18} color="white" />
+            <div style={{ width: "38px", height: "38px", background: "linear-gradient(135deg,#d97706,#f59e0b)", borderRadius: "9px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <AlertTriangle size={18} color="white" />
             </div>
           </div>
         </div>

@@ -7,6 +7,8 @@ import { useSyncStore } from "@/lib/store/sync.store";
 
 const TABLE_MAP: Record<string, string> = {
   products:       "products",
+  productVariants: "product_variants",
+  productBatches:  "product_batches",
   categories:     "categories",
   customers:      "customers",
   suppliers:      "suppliers",

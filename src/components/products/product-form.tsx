@@ -3,10 +3,9 @@ import { useState } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2, Package, X, Barcode, Scale, Tags, CheckSquare } from "lucide-react";
+import { Loader2, Package, X, Barcode, Scale, Tags, CheckSquare, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
-import type { LocalProduct } from "@/lib/db/schema";
-import type { LocalCategory } from "@/lib/db/schema";
+import type { LocalProduct, LocalProductVariant, LocalProductBatch, LocalCategory } from "@/lib/db/schema";
 import { formatCurrency } from "@/lib/utils/currency";
 
 // ── Validation schema ──────────────────────────────────
@@ -30,6 +29,7 @@ const productSchema = z.object({
   has_batches: z.boolean(),
   // For UI only
   variants: z.array(z.object({
+    id: z.string().optional(),
     name: z.string().min(1),
     sku: z.string().optional(),
     barcode: z.string().optional(),
@@ -38,6 +38,7 @@ const productSchema = z.object({
     stock_quantity: z.coerce.number().min(0),
   })).optional(),
   batches: z.array(z.object({
+    id: z.string().optional(),
     batch_number: z.string().min(1),
     expiry_date: z.string().optional(),
     stock_quantity: z.coerce.number().min(0),
@@ -47,7 +48,7 @@ const productSchema = z.object({
 export type ProductFormData = z.infer<typeof productSchema>;
 
 interface ProductFormProps {
-  product?: LocalProduct;
+  product?: LocalProduct & { variants?: LocalProductVariant[], batches?: LocalProductBatch[] };
   categories: LocalCategory[];
   onSubmit: (data: ProductFormData) => Promise<void>;
   onCancel: () => void;
@@ -86,8 +87,21 @@ export function ProductForm({ product, categories, onSubmit, onCancel }: Product
       is_active: product?.is_active ?? true,
       has_variants: product?.has_variants ?? false,
       has_batches: product?.has_batches ?? false,
-      variants: [],
-      batches: [],
+      variants: product?.variants?.map(v => ({
+        id: v.id,
+        name: v.name,
+        sku: v.sku || undefined,
+        barcode: v.barcode || undefined,
+        purchase_price: v.purchase_price,
+        selling_price: v.selling_price,
+        stock_quantity: v.stock_quantity,
+      })) ?? [],
+      batches: product?.batches?.map(b => ({
+        id: b.id,
+        batch_number: b.batch_number,
+        expiry_date: b.expiry_date || undefined,
+        stock_quantity: b.stock_quantity,
+      })) ?? [],
     },
   });
 
@@ -357,6 +371,106 @@ export function ProductForm({ product, categories, onSubmit, onCancel }: Product
             </label>
           </div>
         </section>
+
+        {/* ── Section Variantes ── */}
+        {hasVariants && (
+          <section className="card" style={{ padding: "24px" }}>
+            <h3 style={{ fontSize: "15px", fontWeight: "600", color: "var(--text-primary)", marginBottom: "20px", display: "flex", alignItems: "center", gap: "8px" }}>
+              <Package size={18} style={{ color: "var(--color-primary-600)" }} />
+              Variantes (Tailles, Couleurs, etc.)
+            </h3>
+            
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              {variantFields.map((field, index) => (
+                <div key={field.id} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr 1fr auto", gap: "12px", padding: "16px", background: "var(--bg-muted)", borderRadius: "8px", alignItems: "start" }}>
+                  <div>
+                    <label style={labelStyle}>Nom (ex: L - Bleu) *</label>
+                    <input {...register(`variants.${index}.name`)} className="input" placeholder="L - Bleu" />
+                    {errors.variants?.[index]?.name && <span style={errorStyle}>{errors.variants[index]?.name?.message}</span>}
+                  </div>
+                  <div>
+                    <label style={labelStyle}>SKU</label>
+                    <input {...register(`variants.${index}.sku`)} className="input" placeholder="Optionnel" />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Code-barres</label>
+                    <input {...register(`variants.${index}.barcode`)} className="input" placeholder="Optionnel" />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Prix d'achat</label>
+                    <input type="number" step="0.01" {...register(`variants.${index}.purchase_price`)} className="input" placeholder="Défaut" />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Prix de vente</label>
+                    <input type="number" step="0.01" {...register(`variants.${index}.selling_price`)} className="input" placeholder="Défaut" />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Stock Actuel</label>
+                    <input type="number" step="0.001" {...register(`variants.${index}.stock_quantity`)} className="input" />
+                  </div>
+                  <div style={{ paddingTop: "24px" }}>
+                    <button type="button" onClick={() => removeVariant(index)} className="btn btn-ghost" style={{ padding: "8px", color: "var(--text-warning)" }}>
+                      <X size={16} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+              
+              <button 
+                type="button" 
+                onClick={() => appendVariant({ name: "", stock_quantity: 0 })}
+                className="btn btn-outline"
+                style={{ alignSelf: "flex-start" }}
+              >
+                + Ajouter une variante
+              </button>
+            </div>
+          </section>
+        )}
+
+        {/* ── Section Lots ── */}
+        {hasBatches && (
+          <section className="card" style={{ padding: "24px" }}>
+            <h3 style={{ fontSize: "15px", fontWeight: "600", color: "var(--text-primary)", marginBottom: "20px", display: "flex", alignItems: "center", gap: "8px" }}>
+              <Calendar size={18} style={{ color: "var(--color-primary-600)" }} />
+              Lots et Péremptions
+            </h3>
+            
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              {batchFields.map((field, index) => (
+                <div key={field.id} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr auto", gap: "12px", padding: "16px", background: "var(--bg-muted)", borderRadius: "8px", alignItems: "start" }}>
+                  <div>
+                    <label style={labelStyle}>Numéro de lot *</label>
+                    <input {...register(`batches.${index}.batch_number`)} className="input" placeholder="Lot N°..." />
+                    {errors.batches?.[index]?.batch_number && <span style={errorStyle}>{errors.batches[index]?.batch_number?.message}</span>}
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Date d'expiration</label>
+                    <input type="date" {...register(`batches.${index}.expiry_date`)} className="input" />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Stock Actuel</label>
+                    <input type="number" step="0.001" {...register(`batches.${index}.stock_quantity`)} className="input" />
+                  </div>
+                  <div style={{ paddingTop: "24px" }}>
+                    <button type="button" onClick={() => removeBatch(index)} className="btn btn-ghost" style={{ padding: "8px", color: "var(--text-warning)" }}>
+                      <X size={16} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+              
+              <button 
+                type="button" 
+                onClick={() => appendBatch({ batch_number: "", stock_quantity: 0 })}
+                className="btn btn-outline"
+                style={{ alignSelf: "flex-start" }}
+              >
+                + Ajouter un lot
+              </button>
+            </div>
+          </section>
+        )}
 
         {/* ── Actions ── */}
         <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end", paddingTop: "10px" }}>
