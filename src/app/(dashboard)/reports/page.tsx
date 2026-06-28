@@ -113,11 +113,7 @@ export default function ReportsPage() {
         credits.forEach(c => body.push([`Crédit client (reste)`, c.remaining_amount, new Date(c.created_at).toLocaleDateString()]));
       } else if (id === "clients") {
         title = "Rapport Clients";
-        let clients = await db.customers.toArray();
-        if (clients.length === 0 && typeof window !== "undefined") {
-          const saved = localStorage.getItem("novakam-mock-customers");
-          if (saved) clients = JSON.parse(saved);
-        }
+        const clients = await db.customers.toArray();
         head = [["Nom", "Téléphone", "Dette (FCFA)"]];
         body = clients.map(c => [c.name, c.phone || "-", c.current_debt || 0]);
       } else {

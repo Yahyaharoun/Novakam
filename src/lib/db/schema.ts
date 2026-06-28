@@ -2,6 +2,7 @@
 // IndexedDB schema using Dexie.js for offline-first storage
 
 import Dexie, { type Table } from "dexie";
+import type { UserRole } from "../supabase/database.types";
 import type {
   SyncStatus,
   SaleStatus,
@@ -33,7 +34,7 @@ export interface LocalEmployee {
   name: string;
   email?: string;
   phone?: string;
-  role: string;
+  role: UserRole;
   pin?: string;
   status: "active" | "inactive" | "suspended";
   sync_status: SyncStatus;

@@ -73,7 +73,7 @@ export default function RegistersPage() {
         name: form.name.trim(),
         code: form.code.trim().toUpperCase(),
         location: form.location || undefined,
-        assigned_employee_id: form.assigned_employee_id || null, // null will be handled by the hook
+        assigned_employee_id: form.assigned_employee_id || undefined,
       };
 
       if (editing) {

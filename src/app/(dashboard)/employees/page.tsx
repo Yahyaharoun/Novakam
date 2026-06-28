@@ -238,7 +238,7 @@ export default function EmployeesPage() {
                   <span className="font-semibold text-slate-900 dark:text-white text-sm">{emp.name || 'Sans nom'}</span>
                   <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full ${ROLE_STYLES[emp.role] || 'bg-slate-100 text-slate-700'}`}>
                     {emp.role === 'owner' || emp.role === 'manager' ? <Shield size={10} /> : <User size={10} />}
-                    {ROLE_LABELS[emp.role]?.fr || emp.role || 'Inconnu'}
+                    {(ROLE_LABELS as Record<string, {fr: string; en: string; color: string}>)[emp.role]?.fr || emp.role || 'Inconnu'}
                   </span>
                   {emp.status !== 'active' && (
                     <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">

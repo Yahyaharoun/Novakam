@@ -2,6 +2,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { getDB, type LocalEmployee } from "@/lib/db/schema";
+import type { UserRole } from "@/lib/supabase/database.types";
 import { enqueueSync } from "@/lib/sync/engine";
 import { useAuthStore } from "@/lib/store/auth.store";
 import { v4 as uuid } from "uuid";
@@ -38,7 +39,7 @@ export function useEmployees(search?: string) {
 
   useEffect(() => { load(); }, [load]);
 
-  const createEmployee = useCallback(async (data: { name: string; role: string; phone?: string; email?: string; pin?: string }) => {
+  const createEmployee = useCallback(async (data: { name: string; role: UserRole; phone?: string; email?: string; pin?: string }) => {
     if (!shop?.id) return null;
     const db = getDB();
     const now = new Date().toISOString();

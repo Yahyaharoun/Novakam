@@ -2,25 +2,17 @@
 
 import { useState } from "react";
 import { useDebts } from "@/lib/hooks/use-debts";
-import { useCustomers } from "@/lib/hooks/use-customers";
+import { useSuppliers } from "@/lib/hooks/use-suppliers";
 import { formatCurrency } from "@/lib/utils/currency";
-import { CreditCard, Banknote, Smartphone, HandCoins, AlertCircle } from "lucide-react";
+import { HandCoins, AlertCircle } from "lucide-react";
 import type { PaymentMethod } from "@/lib/supabase/database.types";
 import toast from "react-hot-toast";
-
 import { useI18nStore } from "@/lib/store/i18n.store";
 
 export default function DebtsPage() {
   const { t } = useI18nStore();
   const { debts, isLoading, repayDebt, createDebt, deleteDebt } = useDebts();
-  
-  const [suppliers, setSuppliers] = useState<any[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("novakam-mock-suppliers");
-      if (saved) return JSON.parse(saved);
-    }
-    return [];
-  });
+  const { suppliers } = useSuppliers();
   
   const [selectedCredit, setSelectedCredit] = useState<string | null>(null);
   const [repayAmount, setRepayAmount] = useState("");
@@ -62,7 +54,7 @@ export default function DebtsPage() {
 
   const getSupplierName = (id: string) => {
     const s = suppliers.find(sup => sup.id === id);
-    return s ? s.name : "Unknown Supplier";
+    return s?.name ?? "Fournisseur inconnu";
   };
 
   const handleAddDebt = async (e: React.FormEvent) => {
