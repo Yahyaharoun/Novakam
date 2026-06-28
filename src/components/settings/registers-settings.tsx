@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MonitorSmartphone, Plus, Search, CheckCircle2, QrCode, Monitor, X, User } from "lucide-react";
 import { useAuthStore } from "@/lib/store/auth.store";
 import toast from "react-hot-toast";
@@ -17,21 +17,18 @@ export function RegistersSettings() {
   const [newRegisterPin, setNewRegisterPin] = useState("");
   const [selectedRegisterCode, setSelectedRegisterCode] = useState<string | null>(null);
 
-  // Load cashiers dynamically from the same local storage the Employees page uses
-  const [cashiers, setCashiers] = useState<any[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("novakam-mock-employees");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return parsed.filter((e: any) => e.role === "Caissier" || e.role === "Magasinier");
-      }
+  const [cashiers, setCashiers] = useState<any[]>([]);
+
+  // Load cashiers dynamically using Dexie
+  useEffect(() => {
+    async function load() {
+      if (!currentShop?.id) return;
+      const db = await import('@/lib/db/schema').then(m => m.getDB());
+      const emps = await db.employees.where("shop_id").equals(currentShop.id).toArray();
+      setCashiers(emps.filter(e => e.role === "cashier" || e.role === "warehouse"));
     }
-    return [
-      { id: "c1", name: "Aïssatou Bah" },
-      { id: "c2", name: "Jean Dupont" },
-      { id: "c3", name: "Fatou Diop" }
-    ];
-  });
+    load();
+  }, [currentShop?.id]);
 
   const [registers, setRegisters] = useState(() => {
     if (typeof window !== "undefined") {

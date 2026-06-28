@@ -21,37 +21,6 @@ export function useDebts() {
     try {
       const db = getDB();
 
-      // Migrate mock debts from local storage if they haven't been migrated yet
-      if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem("novakam-mock-suppliers");
-        if (saved) {
-          const suppliers = JSON.parse(saved);
-          for (const s of suppliers) {
-            if (s.remaining_debt > 0) {
-              const existingDebt = await db.debts
-                .where("supplier_id").equals(s.id)
-                .filter(d => d.shop_id === shop.id)
-                .first();
-              if (!existingDebt) {
-                const now = new Date().toISOString();
-                const debt: LocalDebt = {
-                  id: uuid(),
-                  shop_id: shop.id,
-                  supplier_id: s.id,
-                  amount: s.remaining_debt,
-                  remaining_amount: s.remaining_debt,
-                  status: "active",
-                  sync_status: "pending",
-                  created_at: now,
-                  updated_at: now
-                };
-                await db.debts.add(debt);
-              }
-            }
-          }
-        }
-      }
-
       // Load all debts for the shop
       const results = await db.debts
         .where("shop_id").equals(shop.id)
@@ -95,22 +64,7 @@ export function useDebts() {
       const updatedDebt = await db.debts.get(debt.id);
       if (updatedDebt) await enqueueSync("debts", debt.id, "update", updatedDebt);
 
-      // 2. Update Supplier Debt in localStorage
-      if (typeof window !== "undefined") {
-        const saved = localStorage.getItem("novakam-mock-suppliers");
-        if (saved) {
-          const suppliers = JSON.parse(saved);
-          const updatedSuppliers = suppliers.map((s: any) => {
-            if (s.id === debt.supplier_id) {
-              return { ...s, remaining_debt: Math.max(0, s.remaining_debt - params.amount) };
-            }
-            return s;
-          });
-          localStorage.setItem("novakam-mock-suppliers", JSON.stringify(updatedSuppliers));
-        }
-      }
-
-      // 3. Generate Cash Movement (Expense/Withdrawal)
+      // 2. Generate Cash Movement (Expense/Withdrawal)
       let sessionId = undefined;
       if (params.payment_method === "cash") {
         const activeSession = await db.cashRegisterSessions
@@ -158,20 +112,6 @@ export function useDebts() {
     };
     await db.debts.add(debt);
     await enqueueSync("debts", debt.id, "create", debt);
-
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("novakam-mock-suppliers");
-      if (saved) {
-        const suppliers = JSON.parse(saved);
-        const updatedSuppliers = suppliers.map((s: any) => {
-          if (s.id === params.supplier_id) {
-            return { ...s, remaining_debt: s.remaining_debt + params.amount };
-          }
-          return s;
-        });
-        localStorage.setItem("novakam-mock-suppliers", JSON.stringify(updatedSuppliers));
-      }
-    }
 
     await loadDebts();
   }, [shop?.id, loadDebts]);

@@ -70,7 +70,7 @@ export default function SubscriptionPage() {
       if (shop.id.startsWith('mock-')) {
         const db = getDB();
         const prodCount = await db.products.where("shop_id").equals(shop.id).count();
-        const empCount = JSON.parse(localStorage.getItem("novakam-mock-employees") || "[]").filter((e: any) => e.status === 'active').length;
+        const empCount = await db.employees.where("shop_id").equals(shop.id).filter(e => e.status === 'active').count();
         setSubscription({
           id: 'mock-sub',
           plan: shop.plan as Plan,

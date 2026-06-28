@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import {
   ShoppingBag, Plus, Search, Edit, Trash2, Power, PowerOff,
   Loader2, X, Save, AlertCircle, CheckCircle2, User
@@ -9,32 +9,20 @@ import { useAuthStore } from "@/lib/store/auth.store";
 import { useI18nStore } from "@/lib/store/i18n.store";
 import { useRBAC } from "@/lib/rbac/hooks";
 import { UpgradePrompt } from "@/lib/rbac/guard";
-import { createClient } from "@/lib/supabase/client";
 import { PLAN_LIMITS } from "@/lib/rbac/subscription-limits";
 import type { Plan, RegisterStatus } from "@/lib/supabase/database.types";
 import toast from "react-hot-toast";
+import { useRegisters, type RegisterWithEmployee } from "@/lib/hooks/use-registers";
+import type { LocalCashRegister } from "@/lib/db/schema";
+import { useEmployees } from "@/lib/hooks/use-employees";
 
-interface Register {
-  id: string;
-  name: string;
-  code: string;
-  status: RegisterStatus;
-  assigned_employee_id: string | null;
-  location: string | null;
-  notes: string | null;
-  pin: string | null;
-  employee?: { name: string } | null;
-}
-
-interface Employee { id: string; name: string; role: string; }
-
-const STATUS_STYLES: Record<RegisterStatus, string> = {
+const STATUS_STYLES: Record<string, string> = {
   active: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
   inactive: "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400",
   maintenance: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
 };
 
-const STATUS_LABELS: Record<RegisterStatus, string> = {
+const STATUS_LABELS: Record<string, string> = {
   active: "Actif", inactive: "Inactif", maintenance: "Maintenance",
 };
 
@@ -44,64 +32,18 @@ export default function RegistersPage() {
   const { role, can, canCreate, plan } = useRBAC();
   const limits = PLAN_LIMITS[plan as Plan];
 
-  const [registers, setRegisters] = useState<Register[]>([]);
-  const [employees, setEmployees] = useState<Employee[]>([]);
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
+  
+  const { registers, isLoading: loading, createRegister, updateRegister, deleteRegister } = useRegisters(search);
+  const { employees } = useEmployees();
+
   const [showModal, setShowModal] = useState(false);
-  const [editing, setEditing] = useState<Register | null>(null);
+  const [editing, setEditing] = useState<LocalCashRegister | null>(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: "", code: "", pin: "", location: "", notes: "", assigned_employee_id: "" });
 
   const activeCount = registers.filter((r) => r.status === "active").length;
   const limitCheck = canCreate("max_registers_per_shop", activeCount);
-
-  const load = useCallback(async () => {
-    if (!shop?.id) return;
-    setLoading(true);
-    try {
-      if (shop.id.startsWith('mock-')) {
-        let rSaved = JSON.parse(localStorage.getItem("novakam-mock-registers") || "[]");
-        
-        // Auto-fix if they bypassed the limit (e.g. by using multiple tabs)
-        const limit = limits.max_registers_per_shop;
-        if (limit !== -1) {
-            let activeSeen = 0;
-            rSaved = rSaved.map((r: any) => {
-                if (r.status === 'active') {
-                    activeSeen++;
-                    if (activeSeen > limit) return { ...r, status: 'inactive' };
-                }
-                return r;
-            });
-            localStorage.setItem("novakam-mock-registers", JSON.stringify(rSaved));
-        }
-
-        setRegisters(rSaved);
-        const eSaved = localStorage.getItem("novakam-mock-employees");
-        setEmployees(eSaved ? JSON.parse(eSaved).filter((e: any) => e.status === 'active') : []);
-      } else {
-        const supabase = createClient() as any;
-        const { data } = await supabase
-          .from("registers")
-          .select("*, employee:assigned_employee_id(name)")
-          .eq("shop_id", shop.id)
-          .order("created_at", { ascending: false });
-
-        const { data: emps } = await supabase
-          .from("employees")
-          .select("id, name, role")
-          .eq("shop_id", shop.id)
-          .eq("status", "active");
-
-        setRegisters(data ?? []);
-        setEmployees(emps ?? []);
-      }
-    } catch { toast.error("Erreur lors du chargement"); }
-    finally { setLoading(false); }
-  }, [shop?.id]);
-
-  useEffect(() => { load(); }, [load]);
 
   function openCreate() {
     setEditing(null);
@@ -109,9 +51,9 @@ export default function RegistersPage() {
     setShowModal(true);
   }
 
-  function openEdit(r: Register) {
+  function openEdit(r: LocalCashRegister) {
     setEditing(r);
-    setForm({ name: r.name, code: r.code, pin: r.pin ?? "", location: r.location ?? "", notes: r.notes ?? "", assigned_employee_id: r.assigned_employee_id ?? "" });
+    setForm({ name: r.name, code: r.code, pin: "", location: r.location ?? "", notes: "", assigned_employee_id: r.assigned_employee_id ?? "" });
     setShowModal(true);
   }
 
@@ -120,7 +62,7 @@ export default function RegistersPage() {
       toast.error("Le nom et le code sont obligatoires");
       return;
     }
-    // Vérification côté serveur avant création
+    
     if (!editing && !limitCheck.allowed) {
       toast.error("Limite atteinte. Veuillez upgrader votre abonnement.");
       return;
@@ -128,124 +70,61 @@ export default function RegistersPage() {
     setSaving(true);
     try {
       const payload = {
-        shop_id: shop.id,
         name: form.name.trim(),
         code: form.code.trim().toUpperCase(),
-        pin: form.pin || null,
-        location: form.location || null,
-        notes: form.notes || null,
-        assigned_employee_id: form.assigned_employee_id || null,
+        location: form.location || undefined,
+        assigned_employee_id: form.assigned_employee_id || null, // null will be handled by the hook
       };
 
-      if (shop.id.startsWith('mock-')) {
-        let current = JSON.parse(localStorage.getItem("novakam-mock-registers") || "[]");
-        
-        if (!editing) {
-            const currentActive = current.filter((r: any) => r.status === "active").length;
-            const currentLimit = limits.max_registers_per_shop;
-            if (currentLimit !== -1 && currentActive >= currentLimit) {
-                toast.error("Limite atteinte (Vérification stricte)");
-                setSaving(false);
-                return;
-            }
-        }
-
-        // Add employee name for local rendering
-        let employeeObj = null;
-        if (payload.assigned_employee_id) {
-            const emps = JSON.parse(localStorage.getItem("novakam-mock-employees") || "[]");
-            const e = emps.find((x: any) => x.id === payload.assigned_employee_id);
-            if (e) employeeObj = { name: e.name };
-        }
-
-        if (editing) {
-          current = current.map((r: any) => r.id === editing.id ? { ...r, ...payload, employee: employeeObj } : r);
-          toast.success("Caisse mise à jour");
-        } else {
-          current.unshift({ 
-            id: `mock-reg-${Date.now()}`, 
-            created_at: new Date().toISOString(), 
-            status: "active",
-            employee: employeeObj,
-            ...payload 
-          });
-          toast.success("Caisse créée avec succès");
-        }
-        localStorage.setItem("novakam-mock-registers", JSON.stringify(current));
-        setShowModal(false);
-        await load();
-        setSaving(false);
-        return;
-      }
-
-      const supabase = createClient() as any;
-
       if (editing) {
-        const { error } = await supabase.from("registers").update(payload).eq("id", editing.id);
-        if (error) throw error;
+        await updateRegister(editing.id, payload);
         toast.success("Caisse mise à jour");
       } else {
-        // Vérification serveur anti-bypass
-        const res = await fetch(`/api/subscriptions/limits?shop_id=${shop.id}&resource=registers`);
-        const check = await res.json();
-        if (!check.allowed) { toast.error(check.message); setSaving(false); return; }
-
-        const { error } = await supabase.from("registers").insert({ ...payload, status: 'active' });
-        if (error) throw error;
+        await createRegister(payload);
         toast.success("Caisse créée avec succès");
       }
       setShowModal(false);
-      await load();
     } catch (err: any) {
       toast.error(err.message ?? "Erreur lors de la sauvegarde");
-    } finally { setSaving(false); }
+    } finally { 
+      setSaving(false); 
+    }
   }
 
-  async function handleToggleStatus(r: Register) {
+  async function handleToggleStatus(r: LocalCashRegister) {
     if (!can("manage:registers")) return;
-    const newStatus: RegisterStatus = r.status === "active" ? "inactive" : "active";
-    if (shop?.id.startsWith('mock-')) {
-        let current = JSON.parse(localStorage.getItem("novakam-mock-registers") || "[]");
-        
-        if (newStatus === 'active') {
-            const currentActive = current.filter((reg: any) => reg.status === "active").length;
-            const currentLimit = limits.max_registers_per_shop;
-            if (currentLimit !== -1 && currentActive >= currentLimit) {
-                toast.error("Vous devez désactiver une caisse avant d'en activer une autre.");
-                return;
-            }
+    const newStatus = r.status === "active" ? "inactive" : "active";
+    
+    if (newStatus === 'active') {
+        const currentActive = registers.filter((reg) => reg.status === "active").length;
+        const currentLimit = limits.max_registers_per_shop;
+        if (currentLimit !== -1 && currentActive >= currentLimit) {
+            toast.error("Vous devez désactiver une caisse avant d'en activer une autre.");
+            return;
         }
-
-        current = current.map((reg: any) => reg.id === r.id ? { ...reg, status: newStatus } : reg);
-        localStorage.setItem("novakam-mock-registers", JSON.stringify(current));
-        toast.success(`Caisse ${newStatus === "active" ? "activée" : "désactivée"}`);
-        await load();
-        return;
     }
-    const supabase = createClient() as any;
-    const { error } = await supabase.from("registers").update({ status: newStatus }).eq("id", r.id);
-    if (error) toast.error("Erreur"); else { toast.success(`Caisse ${newStatus === "active" ? "activée" : "désactivée"}`); await load(); }
+
+    try {
+      await updateRegister(r.id, { status: newStatus });
+      toast.success(`Caisse ${newStatus === "active" ? "activée" : "désactivée"}`);
+    } catch {
+      toast.error("Erreur");
+    }
   }
 
   async function handleDelete(id: string) {
     if (!can("manage:registers")) return;
     if (!confirm("Supprimer cette caisse ?")) return;
-    if (shop?.id.startsWith('mock-')) {
-        let current = JSON.parse(localStorage.getItem("novakam-mock-registers") || "[]");
-        current = current.filter((reg: any) => reg.id !== id);
-        localStorage.setItem("novakam-mock-registers", JSON.stringify(current));
-        toast.success("Caisse supprimée");
-        await load();
-        return;
+    
+    try {
+      await deleteRegister(id);
+      toast.success("Caisse supprimée");
+    } catch {
+      toast.error("Erreur");
     }
-    const supabase = createClient() as any;
-    const { error } = await supabase.from("registers").delete().eq("id", id);
-    if (error) toast.error("Erreur"); else { toast.success("Caisse supprimée"); await load(); }
   }
 
-  const filtered = registers.filter(
-    (r) => r.name.toLowerCase().includes(search.toLowerCase()) || r.code.toLowerCase().includes(search.toLowerCase())
-  );
+  const activeEmployees = employees.filter(e => e.status === 'active');
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-6">
@@ -289,7 +168,7 @@ export default function RegistersPage() {
       {/* Liste */}
       {loading ? (
         <div className="flex justify-center py-16"><Loader2 size={28} className="animate-spin text-blue-600" /></div>
-      ) : filtered.length === 0 ? (
+      ) : registers.length === 0 ? (
         <div className="text-center py-16 text-slate-400 dark:text-slate-500">
           <ShoppingBag size={40} className="mx-auto mb-3 opacity-30" />
           <p className="font-medium">Aucune caisse trouvée</p>
@@ -297,7 +176,7 @@ export default function RegistersPage() {
         </div>
       ) : (
         <div className="grid gap-3">
-          {filtered.map((r) => (
+          {registers.map((r) => (
             <div key={r.id} className="flex items-center gap-4 p-4 bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl hover:shadow-sm transition-all">
               <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center text-blue-600 dark:text-blue-400 font-black text-sm flex-shrink-0">
                 {r.code.slice(0, 2)}
@@ -310,7 +189,7 @@ export default function RegistersPage() {
                 </div>
                 {r.employee && (
                   <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    <User size={11} /> {(r.employee as any).name}
+                    <User size={11} /> {r.employee.name}
                   </div>
                 )}
                 {r.location && <div className="text-xs text-slate-400 mt-0.5">{r.location}</div>}
@@ -367,7 +246,7 @@ export default function RegistersPage() {
                   onChange={(e) => setForm((f) => ({ ...f, assigned_employee_id: e.target.value }))}
                 >
                   <option value="">— Non assigné —</option>
-                  {employees.map((e) => (
+                  {activeEmployees.map((e) => (
                     <option key={e.id} value={e.id}>{e.name} ({e.role})</option>
                   ))}
                 </select>

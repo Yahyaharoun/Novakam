@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import {
-  UserCheck, Plus, Search, Trash2, Edit, X, Shield, BadgeCheck, User,
+  UserCheck, Plus, Search, Trash2, Edit, X, Shield, User,
   PowerOff, Power, Loader2, Save, AlertCircle
 } from 'lucide-react';
 import { useI18nStore } from '@/lib/store/i18n.store';
@@ -14,13 +14,12 @@ import { PLAN_LIMITS } from '@/lib/rbac/subscription-limits';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import type { Plan, UserRole, EmployeeStatus } from '@/lib/supabase/database.types';
 import toast from 'react-hot-toast';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { getDB } from '@/lib/db/schema';
-import { enqueueSync } from '@/lib/sync/engine';
+import { useEmployees } from '@/lib/hooks/use-employees';
+import type { LocalEmployee } from '@/lib/db/schema';
 
 type Role = UserRole;
 
-const ROLE_STYLES: Record<Role, string> = {
+const ROLE_STYLES: Record<string, string> = {
   owner:       'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-400',
   manager:     'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-400',
   cashier:     'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400',
@@ -30,18 +29,6 @@ const ROLE_STYLES: Record<Role, string> = {
 };
 
 const ASSIGNABLE_ROLES: Role[] = ['manager', 'cashier', 'warehouse', 'accountant', 'support'];
-
-interface Employee {
-  id: string;
-  name: string;
-  role: Role;
-  phone: string | null;
-  email: string | null;
-  hired_date: string | null;
-  status: EmployeeStatus;
-  notes: string | null;
-  pin: string | null;
-}
 
 function formatDate(dateStr: string | null) {
   if (!dateStr) return '—';
@@ -67,13 +54,14 @@ export default function EmployeesPage() {
   const { can, canCreate, plan } = useRBAC();
   const limits = PLAN_LIMITS[plan as Plan];
 
-  const [employees, setEmployees] = useState<Employee[]>([]);
   const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
+  
+  const { employees, isLoading, createEmployee, updateEmployee, deleteEmployee } = useEmployees(search);
+
   const [showModal, setShowModal] = useState(false);
-  const [editing, setEditing] = useState<Employee | null>(null);
+  const [editing, setEditing] = useState<LocalEmployee | null>(null);
   const [saving, setSaving] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState<Employee | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<LocalEmployee | null>(null);
   const [form, setForm] = useState({
     name: '', email: '', phone: '', role: 'cashier' as Role, hired_date: '', notes: '', pin: '',
   });
@@ -81,41 +69,21 @@ export default function EmployeesPage() {
   const activeCount = (employees || []).filter((e) => e.status === 'active').length;
   const limitCheck = canCreate('max_employees', activeCount);
 
-  const localEmployees = useLiveQuery(
-    () => {
-      if (!shop?.id) return [];
-      return getDB().employees
-        .where('shop_id').equals(shop.id)
-        .filter(e => e.status !== 'suspended' && e.status !== 'inactive') // or similar, depending on how you handle deleted. Let's return all.
-        .toArray();
-    },
-    [shop?.id]
-  );
-
-  useEffect(() => {
-    if (localEmployees) {
-      // sort descending by created_at
-      const sorted = [...localEmployees].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      setEmployees(sorted as any[]);
-      setLoading(false);
-    }
-  }, [localEmployees]);
-
   function openCreate() {
     setEditing(null);
     setForm({ name: '', email: '', phone: '', role: 'cashier', hired_date: '', notes: '', pin: '' });
     setShowModal(true);
   }
 
-  function openEdit(emp: Employee) {
+  function openEdit(emp: LocalEmployee) {
     setEditing(emp);
     setForm({
       name: emp.name,
       email: emp.email ?? '',
       phone: emp.phone ?? '',
-      role: emp.role,
-      hired_date: emp.hired_date ?? '',
-      notes: emp.notes ?? '',
+      role: emp.role as Role,
+      hired_date: '', // LocalEmployee doesn't have hired_date/notes natively in this iteration but keeping UI structure
+      notes: '',
       pin: emp.pin ?? '',
     });
     setShowModal(true);
@@ -135,42 +103,21 @@ export default function EmployeesPage() {
       return;
     }
     setSaving(true);
-    const db = getDB();
-    const now = new Date().toISOString();
+    
     const payload = {
       name: form.name.trim(),
-      email: form.email || null,
-      phone: form.phone || null,
+      email: form.email || undefined,
+      phone: form.phone || undefined,
       role: form.role,
-      hired_date: form.hired_date || null,
-      notes: form.notes || null,
-      pin: form.pin || null,
+      pin: form.pin || undefined,
     };
 
     try {
       if (editing) {
-        if (shop.id.startsWith('mock-')) {
-          const updated = employees.map((e) => (e.id === editing.id ? { ...e, ...payload, updated_at: now } : e));
-          localStorage.setItem("novakam-mock-employees", JSON.stringify(updated));
-          setEmployees(updated);
-        } else {
-          const updatedRecord = { ...editing, ...payload, updated_at: now };
-          await db.employees.put(updatedRecord as any);
-          await enqueueSync("employees", editing.id, "update", updatedRecord);
-        }
+        await updateEmployee(editing.id, payload);
         toast.success('Employé mis à jour !');
       } else {
-        if (shop.id.startsWith('mock-')) {
-          const newEmp = { id: `mock-emp-${Date.now()}`, ...payload, shop_id: shop.id, status: 'active', created_at: now, updated_at: now };
-          const current = [newEmp, ...employees];
-          localStorage.setItem("novakam-mock-employees", JSON.stringify(current));
-          setEmployees(current as any[]);
-        } else {
-          const newEmpId = crypto.randomUUID();
-          const newEmp = { id: newEmpId, ...payload, shop_id: shop.id, status: 'active', sync_status: 'pending', created_at: now, updated_at: now };
-          await db.employees.put(newEmp as any);
-          await enqueueSync("employees", newEmpId, "create", newEmp);
-        }
+        await createEmployee(payload);
         toast.success('Employé ajouté !');
       }
       setShowModal(false);
@@ -181,7 +128,7 @@ export default function EmployeesPage() {
     }
   }
 
-  async function handleToggleStatus(emp: Employee) {
+  async function handleToggleStatus(emp: LocalEmployee) {
     if (!can("manage:employees")) return;
     const newStatus: EmployeeStatus = emp.status === 'active' ? 'suspended' : 'active';
     
@@ -191,16 +138,7 @@ export default function EmployeesPage() {
     }
 
     try {
-      if (shop!.id.startsWith('mock-')) {
-        const updated = employees.map((e) => (e.id === emp.id ? { ...e, status: newStatus } : e));
-        localStorage.setItem("novakam-mock-employees", JSON.stringify(updated));
-        setEmployees(updated);
-      } else {
-        const db = getDB();
-        const updatedRecord = { ...emp, status: newStatus, updated_at: new Date().toISOString() };
-        await db.employees.put(updatedRecord as any);
-        await enqueueSync("employees", emp.id, "update", updatedRecord);
-      }
+      await updateEmployee(emp.id, { status: newStatus });
       toast.success(newStatus === 'active' ? 'Employé réactivé' : 'Employé suspendu');
     } catch {
       toast.error('Erreur lors du changement de statut');
@@ -210,16 +148,7 @@ export default function EmployeesPage() {
   async function handleDelete() {
     if (!confirmDelete || !shop?.id) return;
     try {
-      if (shop.id.startsWith('mock-')) {
-        const filtered = employees.filter((e) => e.id !== confirmDelete.id);
-        localStorage.setItem("novakam-mock-employees", JSON.stringify(filtered));
-        setEmployees(filtered);
-      } else {
-        const db = getDB();
-        const deletedRecord = { ...confirmDelete, status: 'inactive', updated_at: new Date().toISOString() };
-        await db.employees.put(deletedRecord as any);
-        await enqueueSync("employees", confirmDelete.id, "update", { ...deletedRecord, is_deleted: true });
-      }
+      await deleteEmployee(confirmDelete.id);
       toast.success('Employé supprimé');
     } catch {
       toast.error('Erreur lors de la suppression');
@@ -228,12 +157,7 @@ export default function EmployeesPage() {
     }
   }
 
-  const filtered = employees.filter(
-    (e) =>
-      (e.name || '').toLowerCase().includes(search.toLowerCase()) ||
-      (e.email || '').toLowerCase().includes(search.toLowerCase()) ||
-      (e.phone || '').includes(search)
-  );
+  const activeEmployees = employees.filter(e => e.status !== 'inactive' && e.status !== 'suspended' || search);
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-6">
@@ -286,19 +210,19 @@ export default function EmployeesPage() {
       </div>
 
       {/* Liste */}
-      {loading ? (
+      {isLoading ? (
         <div className="flex justify-center py-16">
           <Loader2 size={28} className="animate-spin text-blue-600" />
         </div>
-      ) : filtered.length === 0 ? (
+      ) : activeEmployees.length === 0 ? (
         <div className="text-center py-16 text-slate-400 dark:text-slate-500">
           <UserCheck size={40} className="mx-auto mb-3 opacity-30" />
           <p className="font-medium">Aucun employé trouvé</p>
-          {can('manage:employees') && <p className="text-sm mt-1">Ajoutez votre premier employé.</p>}
+          {can('manage:employees') && !search && <p className="text-sm mt-1">Ajoutez votre premier employé.</p>}
         </div>
       ) : (
         <div className="grid gap-3">
-          {filtered.map((emp, i) => (
+          {activeEmployees.map((emp, i) => (
             <div
               key={emp.id}
               className={`flex items-center gap-4 p-4 bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl hover:shadow-sm transition-all ${emp.status !== 'active' ? 'opacity-60' : ''}`}
@@ -325,7 +249,7 @@ export default function EmployeesPage() {
                 <div className="flex items-center gap-3 mt-1 text-xs text-slate-500 dark:text-slate-400 flex-wrap">
                   {emp.phone && <span>{emp.phone}</span>}
                   {emp.email && <span className="hidden sm:inline">{emp.email}</span>}
-                  {emp.hired_date && <span>Depuis {formatDate(emp.hired_date)}</span>}
+                  {emp.created_at && <span>Depuis {formatDate(emp.created_at)}</span>}
                 </div>
               </div>
 
@@ -426,17 +350,6 @@ export default function EmployeesPage() {
                 />
               </div>
 
-              {/* Date d'embauche */}
-              <div>
-                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Date d'embauche</label>
-                <input
-                  type="date"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={form.hired_date}
-                  onChange={(e) => setForm((f) => ({ ...f, hired_date: e.target.value }))}
-                />
-              </div>
-
               {/* Code PIN */}
               <div>
                 <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
@@ -458,17 +371,6 @@ export default function EmployeesPage() {
                 <p className="text-[10px] text-slate-500 mt-1">L'employé utilisera ce code pour se connecter à la caisse.</p>
               </div>
 
-              {/* Notes */}
-              <div>
-                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Notes</label>
-                <textarea
-                  rows={2}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                  placeholder="Notes optionnelles..."
-                  value={form.notes}
-                  onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                />
-              </div>
             </div>
 
             <div className="flex gap-3 pt-1">
@@ -496,8 +398,8 @@ export default function EmployeesPage() {
         <ConfirmModal
           isOpen={true}
           title="Supprimer l'employé"
-          message={`Êtes-vous sûr de vouloir supprimer "${confirmDelete.name}" ? Cette action est irréversible.`}
-          confirmLabel="Supprimer"
+          message={`Êtes-vous sûr de vouloir désactiver "${confirmDelete.name}" ?`}
+          confirmLabel="Désactiver"
           isDestructive={true}
           onConfirm={handleDelete}
           onCancel={() => setConfirmDelete(null)}

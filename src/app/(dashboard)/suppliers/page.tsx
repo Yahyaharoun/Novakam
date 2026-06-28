@@ -4,124 +4,53 @@ import { useState } from 'react';
 import { Truck, Plus, Search, Trash2, Edit, X, Building2 } from 'lucide-react';
 import { useI18nStore } from '@/lib/store/i18n.store';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
-
-const MOCK_SUPPLIERS = [
-  {
-    id: '1',
-    name: 'Distribex Cameroun',
-    contact: 'Pierre Atanga',
-    phone: '+237 677 111 222',
-    total_orders: 3200000,
-    remaining_debt: 150000,
-    status: 'active',
-    category: 'Alimentation',
-  },
-  {
-    id: '2',
-    name: 'SOACAM Grossiste',
-    contact: 'Isabelle Nkomo',
-    phone: '+237 699 333 444',
-    total_orders: 7500000,
-    remaining_debt: 0,
-    status: 'active',
-    category: 'Boissons',
-  },
-  {
-    id: '3',
-    name: 'Afri-Commerce Sarl',
-    contact: 'Moussa Konaté',
-    phone: '+237 654 555 666',
-    total_orders: 980000,
-    remaining_debt: 75000,
-    status: 'active',
-    category: 'Hygiène',
-  },
-  {
-    id: '4',
-    name: 'Douala Market Import',
-    contact: 'Chantal Essono',
-    phone: '+237 677 777 888',
-    total_orders: 450000,
-    remaining_debt: 0,
-    status: 'inactive',
-    category: 'Électroménager',
-  },
-];
-
-type Supplier = typeof MOCK_SUPPLIERS[number];
-
-const CATEGORY_COLORS: Record<string, string> = {
-  Alimentation: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400',
-  Boissons: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400',
-  Hygiène: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-400',
-  Électroménager: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400',
-};
+import { useSuppliers, type SupplierWithStats } from '@/lib/hooks/use-suppliers';
+import toast from 'react-hot-toast';
 
 export default function SuppliersPage() {
   const { t } = useI18nStore();
   const [search, setSearch] = useState('');
-  const [suppliers, setSuppliers] = useState<Supplier[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("novakam-mock-suppliers");
-      if (saved) return JSON.parse(saved);
-    }
-    return MOCK_SUPPLIERS;
-  });
+  
+  const { suppliers, isLoading, createSupplier, updateSupplier, deleteSupplier } = useSuppliers(search);
+
   const [showModal, setShowModal] = useState(false);
-  const [newSupplier, setNewSupplier] = useState({ name: '', contact: '', phone: '', category: '' });
+  const [newSupplier, setNewSupplier] = useState({ name: '', email: '', phone: '', address: '' });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [supplierToDelete, setSupplierToDelete] = useState<string | null>(null);
 
-  const filtered = suppliers.filter(
-    s =>
-      s.name.toLowerCase().includes(search.toLowerCase()) ||
-      s.contact.toLowerCase().includes(search.toLowerCase()) ||
-      s.phone.includes(search)
-  );
-
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!supplierToDelete) return;
-    const updated = suppliers.filter(s => s.id !== supplierToDelete);
-    setSuppliers(updated);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("novakam-mock-suppliers", JSON.stringify(updated));
+    try {
+      await deleteSupplier(supplierToDelete);
+      toast.success(t("common.delete_success") || "Fournisseur supprimé");
+    } catch (e) {
+      toast.error(t("common.error") || "Erreur");
     }
     setSupplierToDelete(null);
   };
 
-  const handleSave = () => {
-    if (!newSupplier.name || !newSupplier.phone) return;
+  const handleSave = async () => {
+    if (!newSupplier.name) return;
     
-    let updated;
-    if (editingId) {
-      updated = suppliers.map(s => 
-        s.id === editingId ? { ...s, name: newSupplier.name, contact: newSupplier.contact, phone: newSupplier.phone, category: newSupplier.category || 'Autre' } : s
-      );
-    } else {
-      const supplier: Supplier = {
-        id: Date.now().toString(),
-        name: newSupplier.name,
-        contact: newSupplier.contact,
-        phone: newSupplier.phone,
-        total_orders: 0,
-        remaining_debt: 0,
-        status: 'active',
-        category: newSupplier.category || 'Autre',
-      };
-      updated = [supplier, ...suppliers];
+    try {
+      if (editingId) {
+        await updateSupplier(editingId, newSupplier);
+        toast.success(t("common.update_success") || "Fournisseur mis à jour");
+      } else {
+        await createSupplier(newSupplier);
+        toast.success(t("common.save_success") || "Fournisseur ajouté");
+      }
+    } catch (error) {
+      toast.error(t("common.error") || "Erreur");
     }
     
-    setSuppliers(updated);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("novakam-mock-suppliers", JSON.stringify(updated));
-    }
-    setNewSupplier({ name: '', contact: '', phone: '', category: '' });
+    setNewSupplier({ name: '', email: '', phone: '', address: '' });
     setEditingId(null);
     setShowModal(false);
   };
 
-  const handleEditClick = (s: Supplier) => {
-    setNewSupplier({ name: s.name, contact: s.contact, phone: s.phone, category: s.category });
+  const handleEditClick = (s: SupplierWithStats) => {
+    setNewSupplier({ name: s.name, email: s.email || '', phone: s.phone || '', address: s.address || '' });
     setEditingId(s.id);
     setShowModal(true);
   };
@@ -155,7 +84,7 @@ export default function SuppliersPage() {
         </div>
         <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
           <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">{t("suppliers.active")}</p>
-          <p className="text-2xl font-bold text-green-600 mt-1">{suppliers.filter(s => s.status === 'active').length}</p>
+          <p className="text-2xl font-bold text-green-600 mt-1">{suppliers.length}</p>
         </div>
         <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
           <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">{t("suppliers.debts")}</p>
@@ -178,20 +107,22 @@ export default function SuppliersPage() {
       {/* Table */}
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
         <div className="overflow-x-auto">
+          {isLoading ? (
+            <div className="p-8 text-center text-slate-500">Chargement...</div>
+          ) : (
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
                 <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t("suppliers.table_supplier")}</th>
-                <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t("suppliers.table_contact")}</th>
+                <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Email</th>
                 <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t("suppliers.table_phone")}</th>
                 <th className="text-right px-6 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t("suppliers.table_orders")}</th>
                 <th className="text-right px-6 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t("suppliers.table_debt")}</th>
-                <th className="text-center px-6 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t("suppliers.table_status")}</th>
                 <th className="px-6 py-3 w-20"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-              {filtered.map(supplier => (
+              {suppliers.map(supplier => (
                 <tr key={supplier.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -200,16 +131,13 @@ export default function SuppliersPage() {
                       </div>
                       <div>
                         <p className="font-medium text-slate-900 dark:text-white text-sm">{supplier.name}</p>
-                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${CATEGORY_COLORS[supplier.category] ?? 'bg-slate-100 text-slate-600'}`}>
-                          {supplier.category}
-                        </span>
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{supplier.contact}</td>
-                  <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{supplier.phone}</td>
+                  <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{supplier.email || '-'}</td>
+                  <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{supplier.phone || '-'}</td>
                   <td className="px-6 py-4 text-sm text-right font-semibold text-slate-900 dark:text-white">
-                    {supplier.total_orders.toLocaleString()} FCFA
+                    {supplier.total_purchases.toLocaleString()} FCFA
                   </td>
                   <td className="px-6 py-4 text-sm text-right font-semibold">
                     {supplier.remaining_debt > 0 ? (
@@ -217,17 +145,6 @@ export default function SuppliersPage() {
                     ) : (
                       <span className="text-green-600 dark:text-green-400">0 FCFA</span>
                     )}
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        supplier.status === 'active'
-                          ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400'
-                          : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
-                      }`}
-                    >
-                      {supplier.status === 'active' ? t("customers.active_status") : t("customers.inactive_status")}
-                    </span>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center justify-end gap-1">
@@ -251,8 +168,8 @@ export default function SuppliersPage() {
               ))}
             </tbody>
           </table>
-
-          {filtered.length === 0 && (
+          )}
+          {!isLoading && suppliers.length === 0 && (
             <div className="py-20 text-center">
               <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center mx-auto mb-4">
                 <Truck size={28} className="text-slate-400" />
@@ -281,13 +198,13 @@ export default function SuppliersPage() {
           <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md">
             <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
               <h2 className="text-lg font-bold text-slate-900 dark:text-white">{editingId ? 'Modifier le fournisseur' : t("suppliers.new")}</h2>
-              <button onClick={() => { setShowModal(false); setEditingId(null); setNewSupplier({ name: '', contact: '', phone: '', category: '' }); }} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors">
+              <button onClick={() => { setShowModal(false); setEditingId(null); setNewSupplier({ name: '', email: '', phone: '', address: '' }); }} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors">
                 <X size={18} className="text-slate-500" />
               </button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{t("suppliers.modal_company")}</label>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{t("suppliers.modal_company")} *</label>
                 <input
                   type="text"
                   value={newSupplier.name}
@@ -297,12 +214,12 @@ export default function SuppliersPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{t("suppliers.modal_contact")}</label>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Email</label>
                 <input
-                  type="text"
-                  value={newSupplier.contact}
-                  onChange={e => setNewSupplier(p => ({ ...p, contact: e.target.value }))}
-                  placeholder="Ex: Jean Dupont"
+                  type="email"
+                  value={newSupplier.email}
+                  onChange={e => setNewSupplier(p => ({ ...p, email: e.target.value }))}
+                  placeholder="Ex: contact@distribex.com"
                   className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                 />
               </div>
@@ -316,32 +233,18 @@ export default function SuppliersPage() {
                   className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{t("suppliers.modal_category")}</label>
-                <select
-                  value={newSupplier.category}
-                  onChange={e => setNewSupplier(p => ({ ...p, category: e.target.value }))}
-                  className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                >
-                  <option value="">{t("suppliers.modal_select_cat")}</option>
-                  <option>Alimentation</option>
-                  <option>Boissons</option>
-                  <option>Hygiène</option>
-                  <option>Électroménager</option>
-                  <option>Autre</option>
-                </select>
-              </div>
             </div>
             <div className="p-6 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-3">
               <button
-                onClick={() => { setShowModal(false); setEditingId(null); setNewSupplier({ name: '', contact: '', phone: '', category: '' }); }}
+                onClick={() => { setShowModal(false); setEditingId(null); setNewSupplier({ name: '', email: '', phone: '', address: '' }); }}
                 className="px-4 py-2 text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
               >
                 {t("suppliers.cancel")}
               </button>
               <button
                 onClick={handleSave}
-                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+                disabled={!newSupplier.name}
+                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50"
               >
                 {editingId ? 'Mettre à jour' : t("suppliers.save")}
               </button>

@@ -4,16 +4,9 @@ import { useState } from 'react';
 import { Users, Plus, Search, Trash2, Edit, X } from 'lucide-react';
 import { useI18nStore } from '@/lib/store/i18n.store';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
-
-const MOCK_CUSTOMERS = [
-  { id: '1', name: 'Mama Adjoua', phone: '+237 677 123 456', total_purchases: 450000, current_debt: 25000, status: 'active' },
-  { id: '2', name: 'Jean-Baptiste Ngono', phone: '+237 699 234 567', total_purchases: 1200000, current_debt: 0, status: 'active' },
-  { id: '3', name: 'Fatou Diallo', phone: '+237 654 345 678', total_purchases: 89000, current_debt: 15000, status: 'active' },
-  { id: '4', name: 'Emmanuel Mbarga', phone: '+237 677 456 789', total_purchases: 320000, current_debt: 50000, status: 'active' },
-  { id: '5', name: 'Marie-Claire Bekono', phone: '+237 699 567 890', total_purchases: 67000, current_debt: 0, status: 'inactive' },
-];
-
-type Customer = typeof MOCK_CUSTOMERS[number];
+import { useCustomers } from '@/lib/hooks/use-customers';
+import type { LocalCustomer } from '@/lib/db/schema';
+import toast from 'react-hot-toast';
 
 const AVATAR_COLORS = [
   'bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400',
@@ -26,65 +19,47 @@ const AVATAR_COLORS = [
 export default function CustomersPage() {
   const { t } = useI18nStore();
   const [search, setSearch] = useState('');
-  const [customers, setCustomers] = useState<Customer[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("novakam-mock-customers");
-      if (saved) return JSON.parse(saved);
-    }
-    return MOCK_CUSTOMERS;
-  });
+  
+  const { customers, isLoading, createCustomer, updateCustomer } = useCustomers(search);
+  
   const [showModal, setShowModal] = useState(false);
-  const [newCustomer, setNewCustomer] = useState({ name: '', phone: '' });
+  const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', email: '', address: '' });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [customerToDelete, setCustomerToDelete] = useState<string | null>(null);
 
-  const filtered = customers.filter(
-    c =>
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.phone.includes(search)
-  );
-
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!customerToDelete) return;
-    const updated = customers.filter(c => c.id !== customerToDelete);
-    setCustomers(updated);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("novakam-mock-customers", JSON.stringify(updated));
+    try {
+      await updateCustomer(customerToDelete, { is_active: false });
+      toast.success(t("customers.delete_success") || "Client supprimé");
+    } catch (err) {
+      toast.error(t("common.error") || "Erreur");
     }
     setCustomerToDelete(null);
   };
 
-  const handleSave = () => {
-    if (!newCustomer.name || !newCustomer.phone) return;
+  const handleSave = async () => {
+    if (!newCustomer.name) return;
     
-    let updated;
-    if (editingId) {
-      updated = customers.map(c => 
-        c.id === editingId ? { ...c, name: newCustomer.name, phone: newCustomer.phone } : c
-      );
-    } else {
-      const customer: Customer = {
-        id: Date.now().toString(),
-        name: newCustomer.name,
-        phone: newCustomer.phone,
-        total_purchases: 0,
-        current_debt: 0,
-        status: 'active',
-      };
-      updated = [customer, ...customers];
+    try {
+      if (editingId) {
+        await updateCustomer(editingId, newCustomer);
+        toast.success(t("common.update_success") || "Client mis à jour");
+      } else {
+        await createCustomer(newCustomer);
+        toast.success(t("customers.save_success") || "Client ajouté");
+      }
+    } catch (error) {
+      toast.error(t("common.error") || "Une erreur est survenue");
     }
     
-    setCustomers(updated);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("novakam-mock-customers", JSON.stringify(updated));
-    }
-    setNewCustomer({ name: '', phone: '' });
+    setNewCustomer({ name: '', phone: '', email: '', address: '' });
     setEditingId(null);
     setShowModal(false);
   };
 
-  const handleEditClick = (c: Customer) => {
-    setNewCustomer({ name: c.name, phone: c.phone });
+  const handleEditClick = (c: LocalCustomer) => {
+    setNewCustomer({ name: c.name, phone: c.phone || '', email: c.email || '', address: c.address || '' });
     setEditingId(c.id);
     setShowModal(true);
   };
@@ -141,6 +116,9 @@ export default function CustomersPage() {
       {/* Table */}
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
         <div className="overflow-x-auto">
+          {isLoading ? (
+             <div className="p-8 text-center text-slate-500">Chargement...</div>
+          ) : (
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
@@ -153,7 +131,7 @@ export default function CustomersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-              {filtered.map((customer, idx) => (
+              {customers.map((customer, idx) => (
                 <tr key={customer.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -163,7 +141,7 @@ export default function CustomersPage() {
                       <span className="font-medium text-slate-900 dark:text-white text-sm">{customer.name}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{customer.phone}</td>
+                  <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{customer.phone || '-'}</td>
                   <td className="px-6 py-4 text-sm text-right font-semibold text-slate-900 dark:text-white">
                     {customer.total_purchases.toLocaleString('fr-FR')} FCFA
                   </td>
@@ -207,9 +185,9 @@ export default function CustomersPage() {
               ))}
             </tbody>
           </table>
-
+          )}
           {/* Empty state */}
-          {filtered.length === 0 && (
+          {!isLoading && customers.length === 0 && (
             <div className="py-20 text-center">
               <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center mx-auto mb-4">
                 <Users size={28} className="text-slate-400" />
@@ -238,13 +216,13 @@ export default function CustomersPage() {
           <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md">
             <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
               <h2 className="text-lg font-bold text-slate-900 dark:text-white">{editingId ? 'Modifier le client' : t("customers.new")}</h2>
-              <button onClick={() => { setShowModal(false); setEditingId(null); setNewCustomer({ name: '', phone: '' }); }} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors">
+              <button onClick={() => { setShowModal(false); setEditingId(null); setNewCustomer({ name: '', phone: '', email: '', address: '' }); }} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors">
                 <X size={18} className="text-slate-500" />
               </button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{t("customers.modal_name")}</label>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{t("customers.modal_name")} *</label>
                 <input
                   type="text"
                   value={newCustomer.name}
@@ -266,14 +244,15 @@ export default function CustomersPage() {
             </div>
             <div className="p-6 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-3">
               <button
-                onClick={() => { setShowModal(false); setEditingId(null); setNewCustomer({ name: '', phone: '' }); }}
+                onClick={() => { setShowModal(false); setEditingId(null); setNewCustomer({ name: '', phone: '', email: '', address: '' }); }}
                 className="px-4 py-2 text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
               >
                 {t("customers.cancel")}
               </button>
               <button
                 onClick={handleSave}
-                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+                disabled={!newCustomer.name}
+                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50"
               >
                 {editingId ? 'Mettre à jour' : t("customers.save")}
               </button>
