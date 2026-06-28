@@ -35,8 +35,8 @@ const ProductCard = memo(({ product, onClick, t }: { product: any; onClick: (pro
       onMouseOut={(e) => e.currentTarget.style.borderColor = "var(--border-color)"}
     >
         {product.track_stock && product.stock_quantity <= 0 && (
-          <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(255,255,255,0.6)", zIndex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <span style={{ background: "#ef4444", color: "white", padding: "4px 8px", borderRadius: "4px", fontSize: "11px", fontWeight: "600" }}>{t("pos.out_of_stock")}</span>
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.35)", zIndex: 1, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "inherit" }}>
+            <span style={{ background: "#ef4444", color: "white", padding: "4px 8px", borderRadius: "4px", fontSize: "11px", fontWeight: "600", letterSpacing: "0.5px" }}>{t("pos.out_of_stock")}</span>
           </div>
         )}
         <p style={{ fontSize: "14px", fontWeight: "600", color: "var(--text-primary)", lineHeight: 1.3, marginBottom: "4px" }}>
@@ -86,12 +86,19 @@ export default function PosPage() {
   });
 
   // Print effect when receiptData changes
+  // Using onafterprint event instead of a setTimeout to avoid race conditions
   useEffect(() => {
     if (receiptData && receiptRef.current) {
-      setTimeout(() => {
-         window.print();
-         setReceiptData(null); // Clear after printing
-      }, 500);
+      const handleAfterPrint = () => {
+        setReceiptData(null);
+        window.removeEventListener('afterprint', handleAfterPrint);
+      };
+      window.addEventListener('afterprint', handleAfterPrint);
+      // Small delay to ensure DOM render is complete before printing
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => window.print());
+      });
+      return () => window.removeEventListener('afterprint', handleAfterPrint);
     }
   }, [receiptData]);
 

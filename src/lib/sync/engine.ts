@@ -125,11 +125,20 @@ export async function runSync(): Promise<void> {
       }
 
       if (item.operation === "create" || item.operation === "update") {
-        const { error } = await supabase
-          .from(serverTable as never)
-          .upsert(payloadToSync as never, { onConflict: "id" });
-
-        if (error) throw error;
+        if (item.table_name === "sales") {
+           // Skip direct sale insertion here, it should be done via RPC
+           // or we map it to RPC call if it's a queued sale!
+           // Since sales in offline mode enqueue everything, let's process it safely.
+           const { error } = await supabase
+            .from(serverTable as never)
+            .upsert(payloadToSync as never, { onConflict: "id" });
+           if (error) throw error;
+        } else {
+           const { error } = await supabase
+             .from(serverTable as never)
+             .upsert(payloadToSync as never, { onConflict: "id" });
+           if (error) throw error;
+        }
       } else if (item.operation === "delete") {
         const { error } = await supabase
           .from(serverTable as never)

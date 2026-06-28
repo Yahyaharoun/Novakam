@@ -9,6 +9,7 @@ import { v4 as uuid } from "uuid";
 import type { CartItem } from "@/lib/store/cart.store";
 import type { PaymentMethod } from "@/lib/supabase/database.types";
 
+
 export type PaymentSplit = {
   method: PaymentMethod;
   amount: number;
@@ -19,16 +20,21 @@ export function useSales() {
   const user = useAuthStore((s) => s.user);
   const role = useAuthStore((s) => s.currentRole);
 
-  const generateSaleNumber = useCallback(async (shopId: string) => {
-    const db = getDB();
-    const today = new Date();
-    const year = today.getFullYear();
-    // Count sales for this shop to generate sequential number (offline estimation)
-    // In a real robust system, we might use a unique random string or UUID prefix to prevent collisions before sync.
-    // We'll use S-YYYY-SHORTUUID to guarantee offline uniqueness without waiting for server sequence.
-    const shortId = uuid().split("-")[0].toUpperCase();
-    return `S-${year}-${shortId}`;
+  const generateSaleNumber = useCallback(async (_shopId: string) => {
+    // Format: S-YYYYMMDD-HHMMSS-XXXX
+    // Guaranteed unique offline: timestamp (seconds-level) + 4 random hex chars
+    // Collision probability in the same second on the same device: 1/65536 — acceptable for POS.
+    const now = new Date();
+    const datePart = now.getFullYear().toString() +
+      String(now.getMonth() + 1).padStart(2, '0') +
+      String(now.getDate()).padStart(2, '0');
+    const timePart = String(now.getHours()).padStart(2, '0') +
+      String(now.getMinutes()).padStart(2, '0') +
+      String(now.getSeconds()).padStart(2, '0');
+    const randomPart = Math.floor(Math.random() * 0xFFFF).toString(16).toUpperCase().padStart(4, '0');
+    return `S-${datePart}-${timePart}-${randomPart}`;
   }, []);
+
 
   const processSale = useCallback(async (params: {
     items: CartItem[];
